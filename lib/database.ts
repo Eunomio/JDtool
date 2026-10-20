@@ -29,7 +29,7 @@ export type Job = {
 };
 
 export const projectStages = ['构思/进行中', '原型', '已测试', '已上线'] as const;
-export type Source = { id: string; jobId?: string; label: string; url: string; text: string; collectedAt: string };
+export type Source = { id: string; jobId?: string; label: string; url: string; text: string; collectedAt: string; kind?: 'web' | 'snippet'; publishedAt?: string };
 export type ProjectFact = { id: string; text: string; sourceText: string; category: string };
 export type Project = {
   id: string; name: string; type: string; stage: string; timeline: string; role: string;
@@ -37,12 +37,12 @@ export type Project = {
   facts: ProjectFact[]; sources: Source[]; confirmed: boolean; sample?: boolean;
   visibility: 'private' | 'display'; redactions: { from: string; to: string }[]; updatedAt: string;
 };
-export type Advice = { text: string; reason: string; requirementIds: string[]; factIds: string[]; sourceIds: string[] };
+export type Advice = { text: string; reason: string; requirementIds: string[]; factIds: string[]; sourceIds: string[]; sourceQuotes?: { sourceId: string; quote: string }[] };
 export type GeneratedBullet = { text: string; factIds: string[]; adopted?: boolean };
 export type Recommendation = { projectId: string; rank: number; role: 'primary' | 'supporting'; matchType: 'direct' | 'transferable' | 'needs_more'; requirementIds: string[]; factIds: string[]; reason: string; resumeBullets: GeneratedBullet[]; interviewOutline: GeneratedBullet[] };
 export type RecommendationResult = { recommendations: Recommendation[]; gaps: Advice[]; needsReview: string[] };
 export type PreparationResult = { priorities: Advice[]; strengths: Advice[]; gaps: Advice[]; companyResearch: Advice[] };
-export type CompanyResult = { facts: Advice[]; hypotheses: Advice[]; questions: Advice[] };
+export type CompanyResult = { facts: Advice[]; hypotheses: Advice[]; questions: Advice[]; research?: { company: string; summary: string; identityNote: string; queries: string[]; searchedAt: string }; roleInsights?: Advice[]; businesses?: Advice[] };
 export type CompareResult = { common: Advice[]; differences: { jobId: string; uniqueRequirements: Advice[]; projects: Advice[]; preparation: Advice[] }[]; reusable: Advice[] };
 export type SavedResult<T> = { id: string; jobId: string; inputVersion: string; projectVersions?: { id: string; updatedAt: string }[]; createdAt: string; data: T };
 export type Task = { id: string; text: string; jobIds: string[]; done: boolean; order: number; createdAt: string };

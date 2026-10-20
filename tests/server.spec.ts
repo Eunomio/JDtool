@@ -4,6 +4,9 @@ import { api, displayText, displayProjectText } from '../lib/client';
 import { POST as recommend } from '../app/api/project-recommendations/route';
 import { modelJson, withModelRequest } from '../lib/model';
 import type { Project, RecommendationResult } from '../lib/database';
+import { researchCompany, groundResearch, type ResearchEvent } from '../lib/company-research';
+import { normalizeHits, webSearch } from '../lib/web-search';
+import { assist } from '../lib/assistant';
 
 async function isolateModel() {
   const original = { key: process.env.CHAT_ECNU_API_KEY, base: process.env.CHAT_ECNU_BASE_URL, directory: process.env.APP_DATA_DIR, limit: process.env.DAILY_MODEL_REQUEST_LIMIT };
@@ -86,4 +89,61 @@ test('脱敏替换反复展示不会重复扩展已替换的名称', () => {
   const multiple = { ...project, redactions: [{ from: '海鸥', to: '张三' }, { from: '张三', to: '求职者' }] };
   expect(displayText('张三负责项目', multiple)).toBe('求职者负责项目');
   expect(displayText('使用产品[a]', { ...project, redactions: [{ from: '产品[a]', to: '某产品' }] })).toBe('使用某产品');
+});
+
+test('搜索结果规范化会去重并拒绝脚本与带凭据链接', () => {
+  const row = { title: '产品介绍', snippet: '公司为企业提供项目协作服务。' };
+  expect(normalizeHits([{ ...row, url: 'javascript:alert(1)' }, { ...row, url: 'https://u:secret@example.com/' }, { ...row, url: 'https://example.com/a?utm_source=x#top' }, { ...row, url: 'https://example.com/a' }])).toEqual([{ ...row, url: 'https://example.com/a' }]);
+});
+
+test('公司研究过滤不可访问来源与虚构引用，读取失败的来源保留摘要标记', async () => {
+  const key = process.env.TAVILY_API_KEY; process.env.TAVILY_API_KEY = 'test-only-search';
+  const job = { id: 'company-job', company: '云帆科技', title: '产品经理', requirements: [{ id: 'r1', text: '分析企业协作需求' }] };
+  const events: ResearchEvent[] = []; let calls = 0; let searched = 0;
+  const deps = {
+    search: async () => { searched++; return [{ title: '公司介绍', url: 'https://example.com/about', snippet: '云帆科技为企业提供项目协作服务。' }, { title: '产品介绍', url: 'https://example.org/product', snippet: '云帆科技提供企业协作产品与需求管理工具。' }, { title: '内网结果', url: 'http://127.0.0.1/internal', snippet: '不应送去分析' }]; },
+    validate: async (input: string) => { if (input.includes('127.0.0.1')) throw new Error('private'); return { url: new URL(input), addresses: [{ address: '93.184.216.34', family: 4 }] }; },
+    read: async (input: string) => { if (input.includes('example.org')) throw new Error('unavailable'); return { status: 200, headers: { 'content-type': 'text/html' }, url: input, body: Buffer.from(`<html><body>${'云帆科技为企业提供项目协作服务。'.repeat(20)}</body></html>`) }; },
+    json: (async (_system: string, content: unknown) => {
+      calls++; if (calls === 1) return { keywords: ['官网 公司业务', '协作产品 需求管理'] };
+      const { sources } = JSON.parse(content as string); expect(sources).toHaveLength(2); expect(sources.some((row: {url:string}) => row.url.includes('127.0.0.1'))).toBe(false);
+      const grounded = { text: '提供企业项目协作服务', reason: '了解目标客户的工作流程', requirementIds: ['r1', 'fake-r'], sourceIds: [sources[0].id], quotes: [{ sourceId: sources[0].id, quote: '云帆科技为企业提供项目协作服务。' }] };
+      return { identityMatched: true, identityNote: '公司名称一致', facts: [grounded, { ...grounded, text: '虚构增长数字', quotes: [{ sourceId: sources[0].id, quote: '营收增长百分之五十' }] }], businesses: [], roleInsights: [grounded], hypotheses: [], questions: [] };
+    }) as typeof import('../lib/model').modelJson,
+  };
+  try {
+    const result = await researchCompany({ job }, (event) => events.push(event), deps);
+    expect(searched).toBe(2); expect(calls).toBe(2); expect(result.sources).toHaveLength(2);
+    expect(result.sources[0].kind).toBe('web'); expect(result.sources[1].kind).toBe('snippet');
+    expect(result.data.facts).toHaveLength(1); expect(result.data.roleInsights![0].requirementIds).toEqual(['r1']);
+    expect(events.map((event) => event.type)).toEqual(['progress', 'progress', 'progress', 'sources', 'progress', 'result']);
+    expect(result.data.research!.queries.every((query) => query.startsWith(job.company))).toBe(true);
+    expect(() => groundResearch({ identityMatched: false, identityNote: '无法区分同名公司', facts: [], businesses: [], roleInsights: [], hypotheses: [], questions: [] }, { job }, result.sources)).toThrow('还无法确认');
+  } finally { if (key === undefined) delete process.env.TAVILY_API_KEY; else process.env.TAVILY_API_KEY = key; }
+});
+
+test('Tavily请求只发送搜索词并对上游错误隐藏密钥和响应正文', async () => {
+  const originalFetch = globalThis.fetch; const key = process.env.TAVILY_API_KEY; const bocha = process.env.BOCHA_API_KEY;
+  delete process.env.BOCHA_API_KEY; process.env.TAVILY_API_KEY = 'test-only-search';
+  try {
+    globalThis.fetch = async (url, options) => { expect(String(url)).toBe('https://api.tavily.com/search'); expect(JSON.parse(options!.body as string)).toMatchObject({ query: '云帆科技 公司业务', search_depth: 'basic', include_answer: false }); return Response.json({ error: 'sensitive upstream detail' }, { status: 401 }); };
+    await expect(webSearch('云帆科技 公司业务', new AbortController().signal)).rejects.toThrow('这次搜索未完成');
+  } finally { globalThis.fetch = originalFetch; for (const [name, value] of [['TAVILY_API_KEY', key], ['BOCHA_API_KEY', bocha]]) { if (value === undefined) delete process.env[name!]; else process.env[name!] = value; } }
+});
+
+test('岗位体验的真实调用提示包含工作沟通规范，提问不会提前推进任务', async () => {
+  const restore = await isolateModel(); const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (_url, options) => {
+      const body = JSON.parse(options!.body as string); const system = body.messages[0].content;
+      expect(system).toContain('禁止小说化叙事'); expect(system).toContain('不自动假设同事已同意');
+      const input = JSON.parse(body.messages[1].content);
+      if (input.stage === 'dialogue') expect(system).toContain('本轮只回复用户向同事提出的问题');
+      else { expect(system).toContain('尚未执行任何操作'); expect(system).toContain('不能声称已经查完日志'); }
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ dialogue: '还需要数据同事确认统计口径，我可以先提供现有反馈记录。', consequence: '', feedback: null }) } }] });
+    };
+    const data = await assist({ action: 'scenario', stage: 'dialogue', job: { id: 'j1', title: '产品经理', company: '云帆科技', content: '负责需求分析' }, answer: '已有的统计口径是什么？' });
+    expect(data).toMatchObject({ consequence: '', feedback: null });
+    await assist({ action: 'scenario', stage: 'decision', job: { id: 'j1', title: '产品经理', company: '云帆科技', content: '负责需求分析' }, answer: '先确认日志的指标与时间范围' });
+  } finally { globalThis.fetch = originalFetch; restore(); }
 });

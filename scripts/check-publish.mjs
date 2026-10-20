@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
-const secrets = ['MODELSCOPE_API_KEY', 'CHAT_ECNU_API_KEY', 'GH_TOKEN', 'GITHUB_TOKEN']
+const secrets = ['MODELSCOPE_API_KEY', 'CHAT_ECNU_API_KEY', 'BOCHA_API_KEY', 'TAVILY_API_KEY', 'GH_TOKEN', 'GITHUB_TOKEN']
   .map((name) => process.env[name]).filter((value) => value && value.length >= 8);
 const files = [...new Set(execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean))];
 const failures = [];

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AppError } from './errors';
 import { modelJson } from './model';
+import { workplaceStyle } from './scenario-style';
 
 const ids = z.array(z.string().max(200)).max(100);
 const short = z.string().max(4000);
@@ -29,7 +30,7 @@ const projectInput = z.object({ id: z.string(), name: z.string(), stage: z.strin
 const sourceInput = z.object({ id: z.string(), label: z.string(), text: z.string().max(45000), url: z.string().optional(), collectedAt: z.string().optional() });
 export const assistInput = z.object({
   action: z.enum(['projects', 'recommendations', 'preparation', 'company', 'compare', 'interview', 'scenario', 'exercise']),
-  job: jobInput.optional(), jobs: z.array(jobInput).max(3).optional(), projects: z.array(projectInput).max(40).optional(), sources: z.array(sourceInput).max(15).optional(),
+  job: jobInput.optional(), jobs: z.array(jobInput).max(3).optional(), projects: z.array(projectInput).max(40).optional(), sources: z.array(sourceInput).max(30).optional(),
   text: z.string().max(80000).optional(), preference: ids.optional(), outputModes: z.array(z.string()).optional(), maxProjects: z.number().int().min(1).max(3).optional(),
   stage: z.string().max(100).optional(), context: z.string().max(40000).optional(), answer: z.string().max(20000).optional(), supplement: z.string().max(20000).optional(), followup: z.string().max(8000).optional(), mode: z.string().optional(),
 });
@@ -56,7 +57,8 @@ function pruneReferences<T>(data: T, input: AssistInput): T {
 async function generate<T extends z.ZodType>(schema: T, prompt: string, input: AssistInput): Promise<z.output<T>> {
   const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
   delete jsonSchema.$schema;
-  const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}`, JSON.stringify(input), jsonSchema, 6000, false));
+  const style = input.action === 'exercise' || input.action === 'scenario' ? `\n${workplaceStyle}${input.stage === 'dialogue' ? '\n本轮只回复用户向同事提出的问题，未提供的信息不要编造。consequence为空，feedback=null，不推进任务。' : input.stage === 'review' ? '\n复盘基于用户实际选择与提问，不评价性格，不把练习写成用户实际完成的工作。' : ''}` : '';
+  const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, 6000, false));
   if (!result.success) throw new AppError(502, 'INVALID_RESULT', '本次结果未完整生成，请重试。');
   return pruneReferences(result.data, input);
 }
@@ -76,7 +78,7 @@ export async function assist(input: AssistInput) {
   }
   if (input.action === 'exercise') {
     if (!input.job) throw new AppError(400, 'MISSING_JOB', '请先选择目标岗位。');
-    return generate(exerciseOutput, '根据当前JD职责与公司已提供的公开资料，制作一套岗位练习。题干question必须考察当前岗位的实际能力；background是明确的假设工作任务；nodes恰好两个顺序决策点，至少一位同事、每节点2—3个合理但取舍不同的选项，change引入相关新约束。所有事件和数据明确为模拟情境，不把推测产品线写成公司事实。公司业务未知时围绕JD明确的职责任务，不擅自指定产品线。dimensions与followupDirections便于一轮文本面试追问与反馈。用自然中文，节点具体可操作，选项避免只剩一个显而易见的正确答案。', input);
+    return generate(exerciseOutput, '根据当前JD明确职责和公司公开资料，制作一份简洁的岗位工作练习。background在130字内写出问题、现有资料、资源限制和交付物，开头用“练习任务：”，无需反复声明公司或产品未指定。question是一道与JD对应的实际岗位面试题。nodes恰好两个先后任务，每个title是工作动作，colleague只填一个职能称呼，situation用同事直接发来的工作消息表达，在130字内说清需要用户处理的事。change仅填写本轮已知的“资源限制：”或“交付要求：”，不能插入突发事件、领导施压、竞品突然发布、项目被叫停等推动剧情的内容。不得使用“此时发现”“突然”“高层要求”“市场反响热烈”等叙事表达。第二项任务延续同一问题，不以“若用户选A则...”编排分支，也不能否定或强行覆盖用户先前的合理选择。每项2—3个都有现实价值、取舍不同的推进方式，每个选项80字内，不用明显错误选项凑数。练习中的假设数据只需最少几项，放在任务材料里，不表述为公司事实。公司资料不明时围绕JD职责，不擅自指定真实产品线。dimensions和followupDirections用于岗位面试复盘。', input);
   }
   if (['recommendations', 'preparation', 'company', 'interview', 'scenario'].includes(input.action) && !input.job) throw new AppError(400, 'MISSING_JOB', '请先选择目标岗位。');
   if (input.action === 'recommendations') {
@@ -136,6 +138,7 @@ export async function assist(input: AssistInput) {
     ? '阅读基础题、岗位能力与候选人回答，针对最影响方案质量的1—2处提出一次具体追问。followup写追问，feedback=null，不提前给最终答案。'
     : '结合context中的原题、answer首次回答、followup实际追问、supplement补充回答，按完整对话给分维度复盘。输出followup为空，feedback含做得好的点、维度反馈、值得补充的点、改进回答提纲和下一步练习。每个维度关联当前岗位的要求ID；反馈基于实际回答，不推断人格或录用概率。', input);
   return generate(scenarioOutput, input.stage === 'review'
-    ? '这是两决策点工作情境的最终复盘。结合全部选择、角色对话和后果评价岗位能力，dialogue和consequence为空，feedback填写分维度复盘与下一步。剧情事件和数据都是模拟材料，不写成公司真实事件或用户已有经历。'
-    : '你扮演情境中当前同事，根据任务和用户行动作一轮有信息量的回应。dialogue是同事发言，consequence是该选择的具体后果或新约束，反馈与已选行动一致；保留模板的两决策点顺序，不替用户做下一决定。feedback=null。数字仅用于明确的模拟任务，不断言公司实际发生。', input);
+    ? '对两项工作任务做简短复盘。结合用户实际提问、选择和已知约束评价岗位能力，dialogue和consequence为空，feedback写分维度反馈和具体下一步。不评价性格，不把练习写成用户已完成的真实工作。'
+    : input.stage === 'dialogue' ? '你是当前任务的职能同事，直接回应用户提问。只提供context已经给出的信息。材料没有说明的数字、日志结论、用户反馈细节或审批状态，都明确说需要向谁确认，不能补写为已经发生的事实。dialogue通常120字以内；consequence为空，feedback=null，不提前推进任务。'
+    : '你是当前任务的职能同事。用户刚提交推进方案，尚未执行任何操作。dialogue在120字内确认该方案需要的协作和下一步，例如“可以先核对日志。请明确要看的指标和时间范围，我再协调数据同事提供；具体分布还需确认。”不能声称已经查完日志、找到瓶颈、完成访谈、获得同意、上线改动或指标改善；context未提供的信息只能说待确认，不填新数据或新问题。consequence在100字内只解释方案的预期影响、成本或遗漏，例如“优先核对数据有助于缩小排查范围；定性反馈还需补充验证”。不擅自执行方案，不跳到下一项任务，不插入新约束，feedback=null。', input);
 }

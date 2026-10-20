@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import JSZip from 'jszip';
 
 test('DOCX简历读取后可核对原文', async ({ page }) => {

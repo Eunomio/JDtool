@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { database, type Job } from '../lib/database';
 import { prepareImage, type UploadImage } from '../lib/image-upload';
 import type { ParsedJob } from '../lib/job-parser';
+import { Icon } from './ui';
 
 type Mode = 'link' | 'images' | 'text';
 type Draft = ParsedJob & { sourceUrl: string; sourceType: Mode; parsedAt?: string };
@@ -88,6 +89,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
   }
 
   if (draft) return <section className="panel import-panel">
+    <div className="import-steps" aria-label="添加岗位进度"><span className="done"><Icon name="check" size={13} />提供岗位</span><span aria-current="step"><b>2</b>核对内容</span><span><b>3</b>开始准备</span></div>
     <div className="section-heading"><div><p className="eyebrow">核对岗位内容</p><h2>{editing ? '编辑岗位' : '识别完成，请核对后保存'}</h2></div><div><button className="text-button" disabled={busy} onClick={() => setDraft(null)}>重新解析原始资料</button><button className="text-button" disabled={busy} onClick={() => { if (editing) onCancel(); else setDraft(null); }}>{editing ? '取消编辑' : '返回输入'}</button></div></div>
     {error && <p role="alert" className="notice error">{error}</p>}
     {draft.warnings.length > 0 && <div className="notice">{draft.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
@@ -98,8 +100,9 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
     </form>
   </section>;
 
-  return <section className="panel import-panel">
-    <h2>新增岗位</h2><p className="muted">提供招聘链接或JD截图，自动整理岗位职责和要求。</p>
+  return <section className="panel import-panel import-start">
+    <div className="import-steps" aria-label="添加岗位进度"><span aria-current="step"><b>1</b>提供岗位</span><span><b>2</b>核对内容</span><span><b>3</b>开始准备</span></div>
+    <div className="import-intro"><span className="import-symbol"><Icon name={mode === 'images' ? 'image' : 'link'} size={27} /></span><p className="eyebrow">先从你感兴趣的机会开始</p><h2>发来岗位，我们一起拆解。</h2><p className="muted">提供招聘链接或JD截图，自动整理岗位职责和要求。</p></div>
     <div role="tablist" aria-label="岗位输入方式" className="tabs">{([['link', '岗位链接'], ['images', 'JD截图'], ['text', '粘贴正文']] as const).map(([key, title]) => <button key={key} role="tab" aria-selected={mode === key} disabled={busy} onClick={() => { setMode(key); setError(''); }}>{title}</button>)}</div>
     {error && <div className="notice error" role="alert"><p>{error}</p>{mode === 'link' && <div className="actions"><button className="text-button" onClick={() => { setMode('images'); setError(''); }}>改用截图</button><button className="text-button" onClick={() => { setMode('text'); setError(''); }}>粘贴正文</button></div>}</div>}
     {duplicate && <div className="notice">已保存“{duplicate.company} · {duplicate.title}”。<button className="text-button" onClick={() => onOpen(duplicate)}>打开已有岗位</button><button className="text-button" onClick={() => { setAllowDuplicate(true); setDuplicate(null); }}>仍要新增</button></div>}

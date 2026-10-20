@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const text = '示例科技\n人因研究工程师\n工作地点：深圳\n岗位职责：设计用户研究实验。\n任职要求：掌握统计分析方法。';
 const job = { isJobPosting: true, rawText: text, title: '人因研究工程师', company: '示例科技', location: '深圳', direction: '人因研究', hiringType: '实习', responsibilities: [{ text: '设计用户研究实验', sourceText: '岗位职责：设计用户研究实验。' }], requirements: [{ text: '掌握统计分析方法', sourceText: '任职要求：掌握统计分析方法。' }], warnings: [] };

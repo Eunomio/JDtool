@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 test('保存、刷新、修改状态、编辑与删除撤销', async ({ page }) => {
   await page.goto('/');

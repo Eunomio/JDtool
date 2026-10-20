@@ -4,6 +4,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 const requests = new AsyncLocalStorage<AbortSignal>();
 
+export function modelRequestSignal() { return requests.getStore(); }
+
 export async function withModelRequest<T>(request: Request, action: () => Promise<T>): Promise<T> {
   // One deadline covers reading inputs, generation, and the second factual check.
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(140_000)]);

@@ -1,10 +1,17 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { database } from '../lib/database';
 import { parseBackup, restoreBackup } from '../lib/backup';
 
 export default function DataBackup({ refresh }: { refresh: () => Promise<void> }) {
   const input = useRef<HTMLInputElement>(null);
+  const menu = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    function outside(event: PointerEvent) { if (menu.current && !menu.current.contains(event.target as Node)) menu.current.open = false; }
+    function escape(event: KeyboardEvent) { if (event.key === 'Escape' && menu.current?.open) { menu.current.open = false; menu.current.querySelector('summary')?.focus(); } }
+    document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); };
+  }, []);
   const [message, setMessage] = useState('');
   async function exportData() {
     try {
@@ -23,5 +30,5 @@ export default function DataBackup({ refresh }: { refresh: () => Promise<void> }
       await refresh(); setMessage('备份已恢复。');
     } catch (error) { setMessage(error instanceof Error ? error.message : '导入未完成。'); }
   }
-  return <details className="backup-menu"><summary>资料备份</summary><div><button className="text-button" onClick={exportData}>导出备份</button><button className="text-button" onClick={() => input.current?.click()}>从备份恢复</button><input ref={input} className="sr-only" type="file" accept="application/json,.json" aria-label="选择备份文件" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importData(file); event.target.value = ''; }} />{message && <p role="status">{message}</p>}</div></details>;
+  return <details className="backup-menu" ref={menu}><summary>资料备份</summary><div><button className="text-button" onClick={exportData}>导出备份</button><button className="text-button" onClick={() => input.current?.click()}>从备份恢复</button><input ref={input} className="sr-only" type="file" accept="application/json,.json" aria-label="选择备份文件" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importData(file); event.target.value = ''; }} />{message && <p role="status">{message}</p>}</div></details>;
 }

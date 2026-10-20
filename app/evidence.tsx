@@ -2,12 +2,12 @@
 import type { Advice, Job, Project, Source } from '../lib/database';
 import { displayText, displayProjectText } from '../lib/client';
 
-export function Evidence({ item, jobs, projects, sources }: { item: Pick<Advice, 'requirementIds' | 'factIds' | 'sourceIds'>; jobs: Job[]; projects: Project[]; sources: Source[] }) {
+export function Evidence({ item, jobs, projects, sources }: { item: Pick<Advice, 'requirementIds' | 'factIds' | 'sourceIds' | 'sourceQuotes'>; jobs: Job[]; projects: Project[]; sources: Source[] }) {
   const requirements = jobs.flatMap((job) => [...(job.requirements || []), ...(job.responsibilities || []), { id: `${job.id}-original`, text: job.content, sourceText: job.content }].map((requirement) => ({ ...requirement, job })));
   return <details className="evidence"><summary>查看依据</summary>
     {item.requirementIds.map((id) => { const reference = requirements.find((requirement) => requirement.id === id); return reference ? <blockquote key={id}><span className="reference-label">{reference.job.company} · {reference.job.sample ? '岗位摘要' : reference.sourceText ? 'JD原句' : '手动补充，待核对'}</span><p>{reference.sourceText || reference.text}</p></blockquote> : null; })}
     {item.factIds.map((id) => { const project = projects.find((project) => project.facts.some((fact) => fact.id === id)); const fact = project?.facts.find((fact) => fact.id === id); return project && fact ? <blockquote key={id}><span className="reference-label">{displayText(project.name, project)} · 原始事实</span><p>{displayText(fact.text, project)}</p><p className="muted">原文：{displayText(fact.sourceText, project)}</p></blockquote> : null; })}
-    {item.sourceIds.map((id) => { const source = sources.find((source) => source.id === id); return source ? <blockquote key={id}><span className="reference-label">{source.label}</span>{source.url && <a href={source.url} target="_blank" rel="noreferrer">查看公开来源</a>}<p>{source.text}</p><small>采集于 {new Date(source.collectedAt).toLocaleString('zh-CN')}</small></blockquote> : null; })}
+    {item.sourceIds.map((id) => { const source = sources.find((source) => source.id === id); const quotes = item.sourceQuotes?.filter((quote) => quote.sourceId === id); return source ? <blockquote key={id}><span className="reference-label">{source.label}{source.kind === 'snippet' ? ' · 搜索摘要' : ''}</span>{source.url && <a href={source.url} target="_blank" rel="noreferrer">查看公开来源</a>}<p>{quotes?.length ? quotes.map((quote) => quote.quote).join('\n') : source.text}</p><small>采集于 {new Date(source.collectedAt).toLocaleString('zh-CN')}</small></blockquote> : null; })}
     {!item.requirementIds.length && !item.factIds.length && !item.sourceIds.length && <p className="muted">建议尚待结合原文确认。</p>}
   </details>;
 }

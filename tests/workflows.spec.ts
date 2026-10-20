@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 
 const feedback = { strengths: ['先核对问题与证据'], dimensions: [{ name: '需求判断', feedback: '能区分数据口径与用户问题，建议补充验证指标。', requirementIds: ['iflytek-pm-d0'] }], improvements: ['补充验证周期'], outline: ['明确问题', '说明行动与验证计划'], nextActions: ['补充一个可验证的成功指标'] };
 const advice = { text: '梳理一个需求分析项目', reason: '对应目标岗位的需求分析职责', requirementIds: ['iflytek-pm-d0'], factIds: ['sample-p1-f1'], sourceIds: [] };
@@ -37,9 +37,11 @@ test('样本项目、岗位准备卡、事实组装与加入计划', async ({ pa
   await expect(page.getByRole('heading', { name: '专业桌面软件升级项目', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '岗位清单', exact: true }).click();
   await page.locator('article').filter({ hasText: '科大讯飞' }).getByRole('button', { name: '产品经理', exact: true }).click();
+  await page.getByRole('tab', { name: /面试准备/ }).click();
   await page.getByRole('button', { name: '生成岗位准备卡', exact: true }).click();
   await expect(page.getByRole('heading', { name: '岗位准备卡', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '加入我的计划', exact: true }).first().click();
+  await page.getByRole('tab', { name: /准备项目/ }).click();
   await page.getByRole('checkbox', { name: '专业桌面软件升级项目', exact: true }).check();
   await page.getByRole('button', { name: '用所选原始事实手动组装' }).click();
   await expect(page.getByRole('textbox', { name: '简历要点1', exact: true })).toHaveValue('在PC端专业软件重构中整理和优化需求');
@@ -62,6 +64,7 @@ test('相近与跨方向比较形成各岗位准备任务', async ({ page }) => 
   await page.getByRole('tab', { name: '跨方向比较' }).click();
   await page.getByRole('checkbox', { name: /蔚来 · 人机工程师/ }).uncheck(); await page.getByRole('checkbox', { name: /科大讯飞/ }).check();
   await page.getByRole('button', { name: '比较所选岗位' }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button', { name: '加入我的计划', exact: true }).first().click();
   await page.getByRole('button', { name: '岗位清单', exact: true }).click(); await expect(page.getByRole('heading', { name: '本周准备' })).toBeVisible();
 });
@@ -82,7 +85,7 @@ test('面试一次追问、复盘保存与两决策剧情', async ({ page }) => 
   await page.getByRole('radio').first().check(); await page.getByRole('button', { name: '提交行动', exact: true }).click();
   await page.getByRole('button', { name: '继续下一项任务' }).click();
   await page.getByRole('radio').first().check(); await page.getByRole('button', { name: '提交行动', exact: true }).click();
-  await page.getByRole('button', { name: '查看下班复盘' }).click(); await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '查看任务复盘' }).click(); await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
   await page.reload(); await page.getByRole('button', { name: '岗位体验', exact: true }).click(); await page.getByLabel('选择目标岗位').selectOption('sample-iflytek-pm');
   await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
 });

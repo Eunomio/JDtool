@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './fixtures';
 import { readFile } from 'node:fs/promises';
 
 const now = '2026-10-20T08:00:00.000Z';
@@ -10,6 +10,7 @@ const exercise = { id: 'review-exercise', direction: '后端开发', background:
 const feedback = { strengths: ['能说明事务边界'], dimensions: [], improvements: [], outline: ['说明隔离级别'], nextActions: [] };
 
 async function importBackup(page: Page, data: unknown = backup) {
+  await page.route('**/api/company/research', (route) => route.fulfill({ status: 503, json: { error: { code: 'SEARCH_UNAVAILABLE', message: '公司搜索暂时不可用，可以先准备项目。' } } }));
   await page.goto('/');
   await expect(page.getByRole('button', { name: '体验6个示例岗位' })).toBeEnabled();
   await page.getByText('资料备份', { exact: true }).click();
@@ -22,6 +23,7 @@ async function importBackup(page: Page, data: unknown = backup) {
 async function openJob(page: Page) {
   await page.getByRole('button', { name: '岗位清单', exact: true }).click();
   await page.getByRole('button', { name: job.title, exact: true }).click();
+  await page.getByRole('tab', { name: /准备项目/ }).click();
 }
 
 async function assemble(page: Page) {
@@ -65,6 +67,7 @@ test('修改脱敏规则后旧文案和理由同步替换，重新核对后才�
 test('清除项目时清除生成文案及关联计划，保留岗位并可完整备份恢复', async ({ page, browser }) => {
   await page.route('**/api/assist', (route) => route.fulfill({ json: { priorities: [advice], strengths: [advice], gaps: [], companyResearch: [] } }));
   await importBackup(page); await assemble(page);
+  await page.getByRole('tab', { name: /面试准备/ }).click();
   await page.getByRole('button', { name: '生成岗位准备卡', exact: true }).click();
   await page.getByRole('button', { name: '加入我的计划', exact: true }).first().click();
   await expect(page.getByText('已加入本周准备。', { exact: true })).toBeVisible();
@@ -75,7 +78,9 @@ test('清除项目时清除生成文案及关联计划，保留岗位并可完�
   const context = await browser.newContext();
   try {
     const other = await context.newPage(); await importBackup(other, fullBackup); await openJob(other);
+    await other.getByRole('tab', { name: /面试准备/ }).click();
     await expect(other.getByRole('heading', { name: '岗位准备卡', exact: true })).toBeVisible();
+    await other.getByRole('tab', { name: /准备项目/ }).click();
     await expect(other.getByLabel('简历要点1', { exact: true })).toHaveValue(project.facts[0].text);
     await expect(other.getByRole('checkbox', { name: '已核对，采用这条表述' })).toBeChecked();
   } finally { await context.close(); }
@@ -139,6 +144,7 @@ test('删除未使用的项目保留其他项目的独立文案', async ({ page 
 test('另一个标签页清除项目后，撤销岗位删除不会恢复已清除的文案', async ({ page, context }) => {
   await page.route('**/api/assist', (route) => route.fulfill({ json: { priorities: [advice], strengths: [], gaps: [], companyResearch: [] } }));
   await importBackup(page); await assemble(page);
+  await page.getByRole('tab', { name: /面试准备/ }).click();
   await page.getByRole('button', { name: '生成岗位准备卡', exact: true }).click();
   await page.getByRole('button', { name: '加入我的计划', exact: true }).click();
   await expect(page.getByText('已加入本周准备。', { exact: true })).toBeVisible();

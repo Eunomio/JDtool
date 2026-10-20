@@ -37,7 +37,7 @@ export async function validatePublicUrl(input: string) {
   return { url, addresses };
 }
 
-async function publicRequest(input: string, headers: Record<string, string> = {}, redirects = 0, method: 'GET' | 'POST' = 'GET', body?: string): Promise<{ body: Buffer; headers: Record<string, string>; status: number; url: string }> {
+export async function publicRequest(input: string, headers: Record<string, string> = {}, redirects = 0, method: 'GET' | 'POST' = 'GET', body?: string, signal?: AbortSignal): Promise<{ body: Buffer; headers: Record<string, string>; status: number; url: string }> {
   if (redirects > 4) throw new AppError(422, 'SOURCE_UNAVAILABLE', '网页跳转过多，请上传截图或粘贴正文继续。');
   const { url, addresses } = await validatePublicUrl(input);
   const dispatcher = new Agent({ connect: { lookup: (_hostname, options, callback) => {
@@ -48,12 +48,12 @@ async function publicRequest(input: string, headers: Record<string, string> = {}
   } } });
   try {
     const response = await safeFetch(url, {
-      dispatcher, redirect: 'manual', signal: AbortSignal.timeout(12_000), method, body,
+      dispatcher, redirect: 'manual', signal: AbortSignal.any([signal || AbortSignal.timeout(12_000), AbortSignal.timeout(12_000)]), method, body,
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36', ...headers },
     });
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       await response.body?.cancel();
-      return publicRequest(new URL(response.headers.get('location')!, url).href, headers, redirects + 1, response.status === 303 ? 'GET' : method, response.status === 303 ? undefined : body);
+      return publicRequest(new URL(response.headers.get('location')!, url).href, headers, redirects + 1, response.status === 303 ? 'GET' : method, response.status === 303 ? undefined : body, signal);
     }
     const reader = response.body?.getReader();
     const chunks: Uint8Array[] = [];
@@ -69,7 +69,7 @@ async function publicRequest(input: string, headers: Record<string, string> = {}
   } finally { await dispatcher.close(); }
 }
 
-function textFromHtml(html: string) {
+export function textFromHtml(html: string) {
   const $ = load(html);
   const structured: string[] = [];
   $('script[type="application/ld+json"]').each((_index, script) => {

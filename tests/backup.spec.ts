@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import { readFile } from 'node:fs/promises';
 
 test('导出资料后可在独立浏览器恢复岗位', async ({ page, browser }) => {
