@@ -4,6 +4,7 @@ import { AppError } from './errors';
 import { classificationInstruction, groundClassification } from './role-classification';
 import { classificationOutputSchema } from './classification-schema';
 import type { RoleClassification } from './role-taxonomy';
+import { normalizeHiringType } from './job-normalization';
 
 const item = z.object({ text: z.string().max(2000), sourceText: z.string().max(3000) });
 export const parsedJobSchema = z.object({
@@ -56,5 +57,5 @@ export async function parseJob(text: string, images: InputImage[] = []) {
     if (original !== data[group].length) data.warnings.push('部分条目未找到对应原句，请对照原文补充。');
   }
   if (!data.rawText.trim()) throw new AppError(422, 'EMPTY_RECOGNITION', '没有识别到清晰文字，请重新上传截图。');
-  return { ...data, classification: groundClassification(data.classification, { ...data, content: data.rawText }) };
+  return { ...data, hiringType: normalizeHiringType(data.hiringType), classification: groundClassification(data.classification, { ...data, content: data.rawText }) };
 }

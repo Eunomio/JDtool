@@ -5,6 +5,7 @@ export { expect, type Page } from '@playwright/test';
 export const test = base.extend<{ isolateResearch: void }>({
   isolateResearch: [async ({ context }, use) => {
     await context.route('**/api/company/research', (route) => route.fulfill({ status: 503, json: { error: { code: 'SEARCH_UNAVAILABLE', message: '公司搜索暂时不可用，可以先准备项目。' } } }));
+    await context.route('**/api/jobs/classify', (route) => route.fulfill({ status: 503, json: { error: { code: 'CLASSIFICATION_UNAVAILABLE', message: '岗位归类暂时不可用。' } } }));
     await use();
   }, { auto: true }],
 });

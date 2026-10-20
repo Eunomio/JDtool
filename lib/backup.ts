@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { database, statuses, projectStages } from './database';
 import { discardTaskChanges } from './task-storage';
 import { storedClassificationSchema, roleCategoryIdSchema } from './classification-schema';
+import { normalizeHiringType } from './job-normalization';
 
 const id = z.string().min(1).max(300);
 const text = z.string();
@@ -23,7 +24,7 @@ const saved = { id, jobId: id, inputVersion: text, projectVersions: z.array(z.ob
 const job = z.object({
   id, title: text, company: text, content: text, sourceUrl: url.optional(), sourceType: z.enum(['link', 'images', 'text']).optional(),
   images: z.array(z.object({ name: text, dataUrl: z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/) })).max(3).optional(),
-  location: text.optional(), direction: text.optional(), hiringType: text.optional(), responsibilities: z.array(reference).optional(), requirements: z.array(reference).optional(),
+  location: text.optional(), direction: text.optional(), hiringType: text.transform(normalizeHiringType).optional(), responsibilities: z.array(reference).optional(), requirements: z.array(reference).optional(),
   classification: storedClassificationSchema.optional(), categoryOverride: roleCategoryIdSchema.optional(),
   warnings: z.array(text).optional(), parsedAt: date.optional(), sample: z.boolean().optional(), applicationDate: text.optional(), interviewDate: text.optional(), endReason: text.optional(),
   statusHistory: z.array(z.object({ status: z.enum(statuses), at: date })).optional(), status: z.enum(statuses), nextAction: text, createdAt: date, updatedAt: date,

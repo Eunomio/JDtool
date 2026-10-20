@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AppError } from './errors';
 import { modelJson } from './model';
 import { workplaceStyle } from './scenario-style';
+import { splitDialogue } from './dialogue';
 
 const ids = z.array(z.string().max(200)).max(100);
 const short = z.string().max(4000);
@@ -60,7 +61,12 @@ async function generate<T extends z.ZodType>(schema: T, prompt: string, input: A
   const style = input.action === 'exercise' || input.action === 'scenario' ? `\n${workplaceStyle}${input.stage === 'dialogue' ? '\n本轮只回复用户向同事提出的问题，未提供的信息不要编造。consequence为空，feedback=null，不推进任务。' : input.stage === 'review' ? '\n复盘基于用户实际选择与提问，不评价性格，不把练习写成用户实际完成的工作。' : ''}` : '';
   const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, 6000, false));
   if (!result.success) throw new AppError(502, 'INVALID_RESULT', '本次结果未完整生成，请重试。');
-  return pruneReferences(result.data, input);
+  const data = pruneReferences(result.data, input);
+  if (input.action === 'exercise' && data && typeof data === 'object' && 'nodes' in data && Array.isArray(data.nodes)) {
+    for (const node of data.nodes) node.situation = splitDialogue(node.situation, node.colleague).content;
+  }
+  if (input.action === 'scenario' && data && typeof data === 'object' && 'dialogue' in data && typeof data.dialogue === 'string') data.dialogue = splitDialogue(data.dialogue).content;
+  return data;
 }
 
 export async function assist(input: AssistInput) {

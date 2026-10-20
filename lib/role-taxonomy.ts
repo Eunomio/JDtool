@@ -3,7 +3,7 @@ export const roleCategories = [
   { id: 'visual_design', name: '视觉与界面设计', family: '设计与研究', description: '界面视觉、品牌表现与设计规范' },
   { id: 'user_research', name: '用户研究与人因', family: '设计与研究', description: '用户研究、实验设计、行为分析与人因验证' },
   { id: 'industrial_design', name: '工业与产品造型设计', family: '设计与研究', description: '实体产品形态、结构体验与材料工艺' },
-  { id: 'product_management', name: '产品管理', family: '产品与业务', description: '需求决策、产品规划与业务目标' },
+  { id: 'product_management', name: '产品经理', family: '产品与业务', description: '需求决策、产品规划与业务目标' },
   { id: 'project_management', name: '项目与交付管理', family: '产品与业务', description: '项目计划、跨团队推进与客户交付' },
   { id: 'frontend_engineering', name: '前端开发', family: '研发与工程', description: '网页界面、交互实现与前端工程' },
   { id: 'backend_engineering', name: '后端开发', family: '研发与工程', description: '服务端、接口、数据库与系统设计' },
@@ -21,7 +21,7 @@ export const roleCategories = [
   { id: 'sales', name: '销售与商务', family: '商业与职能', description: '客户拓展、商务合作与销售服务' },
   { id: 'business_functions', name: '企业职能', family: '商业与职能', description: '人力、财务、法务与行政支持' },
   { id: 'other', name: '其他专业岗位', family: '其他', description: '职责明确，暂未涵盖的专业领域' },
-  { id: 'undetermined', name: '待确认类别', family: '待确认', description: 'JD信息不足或职责边界尚需确认' },
+  { id: 'undetermined', name: '信息待补充', family: '信息待补充', description: '补充职责与要求后自动归类' },
 ] as const;
 
 export type RoleCategoryId = typeof roleCategories[number]['id'];
@@ -37,6 +37,6 @@ export function roleInputVersion(job: RoleInput) {
 
 export function categoryFor(job: RoleInput & { classification?: RoleClassification; categoryOverride?: RoleCategoryId }) {
   const current = job.classification && job.classification.inputVersion === roleInputVersion(job);
-  const id = job.categoryOverride || (current && job.classification!.confidence !== 'low' ? job.classification!.categoryId : 'undetermined');
+  const id = job.categoryOverride || (current ? job.classification!.categoryId : 'undetermined');
   return roleCategories.find(category => category.id === id) || roleCategories[roleCategories.length - 1];
 }

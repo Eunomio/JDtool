@@ -12,6 +12,8 @@ import { groundClassification, classifyJobs } from '../lib/role-classification';
 import { categoryFor, roleInputVersion } from '../lib/role-taxonomy';
 import { parseJob } from '../lib/job-parser';
 import { parseBackup } from '../lib/backup';
+import { normalizeHiringType } from '../lib/job-normalization';
+import { splitDialogue } from '../lib/dialogue';
 
 function setEnvironment(values: Record<string, string | undefined>) {
   const original = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
@@ -157,10 +159,11 @@ test('岗位体验的真实调用提示包含工作沟通规范，提问不会�
       const input = JSON.parse(body.messages[1].content);
       if (input.stage === 'dialogue') expect(system).toContain('本轮只回复用户向同事提出的问题');
       else { expect(system).toContain('尚未执行任何操作'); expect(system).toContain('不能声称已经查完日志'); }
-      return Response.json({ choices: [{ message: { content: JSON.stringify({ dialogue: '还需要数据同事确认统计口径，我可以先提供现有反馈记录。', consequence: '', feedback: null }) } }] });
+      expect(system).toContain('只填写角色实际说出口的消息正文');
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ dialogue: '产品经理回复道：“还需要数据同事确认统计口径，我可以先提供现有反馈记录。”', consequence: '', feedback: null }) } }] });
     };
     const data = await assist({ action: 'scenario', stage: 'dialogue', job: { id: 'j1', title: '产品经理', company: '云帆科技', content: '负责需求分析' }, answer: '已有的统计口径是什么？' });
-    expect(data).toMatchObject({ consequence: '', feedback: null });
+    expect(data).toMatchObject({ dialogue: '还需要数据同事确认统计口径，我可以先提供现有反馈记录。', consequence: '', feedback: null });
     await assist({ action: 'scenario', stage: 'decision', job: { id: 'j1', title: '产品经理', company: '云帆科技', content: '负责需求分析' }, answer: '先确认日志的指标与时间范围' });
   } finally { globalThis.fetch = originalFetch; restore(); }
 });
@@ -277,10 +280,12 @@ test('前排网页无法读取时继续尝试后续原生搜索来源，最多�
   } finally { restore(); }
 });
 
-test('分类必须引用JD正文，无依据结果与修改过JD的旧分类归为待确认', () => {
+test('分类必须引用JD正文，无依据结果与修改过JD的旧分类等待补充信息', () => {
   const job = { title: '交互设计师', content: '负责用户访谈和实验设计，采集行为数据并使用统计方法验证研究假设。' };
   const valid = groundClassification({ categoryId: 'user_research', confidence: 'high', reason: '实际工作是研究实验', evidence: ['负责用户访谈和实验设计'] }, job)!;
   expect(categoryFor({ ...job, classification: valid }).id).toBe('user_research');
+  expect(categoryFor({ ...job, classification: { ...valid, confidence: 'low' } }).id).toBe('user_research');
+  expect(categoryFor({ ...job, categoryOverride: 'product_management' }).name).toBe('产品经理');
   expect(categoryFor({ ...job, content: '负责服务端接口与数据库开发。', classification: valid }).id).toBe('undetermined');
   const fabricated = groundClassification({ categoryId: 'experience_design', confidence: 'high', reason: '岗位名称包含交互', evidence: ['设计交互原型并验证用户流程'] }, job)!;
   expect(fabricated.categoryId).toBe('undetermined'); expect(fabricated.evidence).toEqual([]);
@@ -291,8 +296,9 @@ test('解析JD同时保留原岗位名称，并将有正文依据的职位分类
   const restore = await isolateModel(); const originalFetch = globalThis.fetch;
   const content = '公司：测试公司。岗位：体验设计师。负责用户流程和交互原型设计，开展可用性测试。';
   try {
-    globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ isJobPosting: true, rawText: '', title: '体验设计师', company: '测试公司', location: '', direction: '交互体验', hiringType: '', responsibilities: [{ text: '用户流程和原型设计', sourceText: '负责用户流程和交互原型设计' }], requirements: [], warnings: [], classification: { categoryId: 'experience_design', confidence: 'high', reason: '工作内容为流程与原型设计', evidence: ['负责用户流程和交互原型设计'] } }) } }] });
+    globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ isJobPosting: true, rawText: '', title: '体验设计师', company: '测试公司', location: '', direction: '交互体验', hiringType: '校园招聘', responsibilities: [{ text: '用户流程和原型设计', sourceText: '负责用户流程和交互原型设计' }], requirements: [], warnings: [], classification: { categoryId: 'experience_design', confidence: 'high', reason: '工作内容为流程与原型设计', evidence: ['负责用户流程和交互原型设计'] } }) } }] });
     const result = await parseJob(content);
+    expect(result.hiringType).toBe('校招'); expect(result.rawText).toBe(content);
     expect(result.title).toBe('体验设计师'); expect(result.classification?.categoryId).toBe('experience_design');
     expect(result.classification?.inputVersion).toBe(roleInputVersion({ ...result, content }));
   } finally { globalThis.fetch = originalFetch; restore(); }
@@ -319,4 +325,31 @@ test('备份保留分类依据和手动合并记录，拒绝损坏的职位分�
 test('单次归类超过六个岗位时先拒绝请求，不消耗生成额度', async ({ request }) => {
   const response = await request.post('/api/jobs/classify', { data: { jobs: Array.from({ length: 7 }, (_, index) => ({ id: `too-many-${index}`, title: '设计师', content: '负责用户流程与交互原型设计，并进行测试验证。' })) } });
   expect(response.status()).toBe(400); expect((await response.json()).error.code).toBe('INVALID_CLASSIFICATION_INPUT');
+});
+
+test('招聘类型只合并校招的同义名称，保留其他类型和JD原文', () => {
+  expect(normalizeHiringType(' 校园 招聘 ')).toBe('校招'); expect(normalizeHiringType('校招')).toBe('校招');
+  for (const type of ['实习', '社会招聘', '校园招聘实习生', '校招 / 实习', '']) expect(normalizeHiringType(type)).toBe(type);
+  const now = new Date().toISOString();
+  const job = { id: 'normalize-job', title: '产品经理', company: '测试公司', content: '校园招聘：负责需求分析和产品规划。', hiringType: '校园招聘', status: '关注中', nextAction: '', createdAt: now, updatedAt: now };
+  const restored = parseBackup({ format: 'jdtool-backup', version: 1, jobs: [job] }).jobs[0];
+  expect(restored.hiringType).toBe('校招'); expect(restored.content).toBe(job.content);
+});
+
+test('工作消息分开说话人和正文，保留正文里的引述与冒号', () => {
+  expect(splitDialogue('产品经理发来消息：“请给座椅噪音和氛围灯反馈排序，下午评审要用。”', '产品经理')).toEqual({ speaker: '产品经理', action: '发来消息', content: '请给座椅噪音和氛围灯反馈排序，下午评审要用。' });
+  expect(splitDialogue('技术负责人回复道：“先核对日志，再确认范围。”', '技术负责人').content).toBe('先核对日志，再确认范围。');
+  expect(splitDialogue('产品经理：请整理反馈。', '产品经理').content).toBe('请整理反馈。');
+  expect(splitDialogue('“请核对反馈里提到的“滑轨噪音”，再排优先级。”', '产品经理').content).toBe('请核对反馈里提到的“滑轨噪音”，再排优先级。');
+  for (const content of ['反馈里写着：“座椅有噪音”，请先核对。', '请整理两类反馈：座椅噪音和灯光颜色。', '“第一条反馈”“第二条反馈”']) expect(splitDialogue(content, '产品经理').content).toBe(content);
+});
+
+test('生成工作任务时清理说话介绍，保留独立的角色和交付要求', async () => {
+  const restore = await isolateModel(); const originalFetch = globalThis.fetch;
+  const node = { title: '排序反馈', colleague: '产品经理', situation: '产品经理发来消息：“请先整理反馈覆盖人数，再评估优先级。”', choices: ['核对覆盖人数', '整理复现条件'], change: '交付要求：给出优先级和理由。' };
+  try {
+    globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ id: 'message-exercise', direction: '产品经理', background: '练习任务：整理反馈优先级。', question: '如何安排需求优先级？', dimensions: ['分析', '沟通', '协作'], followupDirections: [], nodes: [node, { ...node, title: '确定验证方案' }] }) } }] });
+    const data = await assist({ action: 'exercise', job: { id: 'message-job', title: '产品经理', company: '测试公司', content: '负责需求分析和产品优先级规划。' } });
+    expect(data).toMatchObject({ nodes: [{ colleague: '产品经理', situation: '请先整理反馈覆盖人数，再评估优先级。', change: node.change }, { situation: '请先整理反馈覆盖人数，再评估优先级。' }] });
+  } finally { globalThis.fetch = originalFetch; restore(); }
 });

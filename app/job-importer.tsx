@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { database, type Job } from '../lib/database';
 import { prepareImage, type UploadImage } from '../lib/image-upload';
 import type { ParsedJob } from '../lib/job-parser';
+import { normalizeHiringType } from '../lib/job-normalization';
 import { Icon } from './ui';
 import { roleCategories, roleInputVersion } from '../lib/role-taxonomy';
 
@@ -77,7 +78,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
         title: String(fields.get('title') || '').trim() || '待补充岗位', company: String(fields.get('company') || '').trim(),
         content: String(fields.get('rawText') || '').trim(), sourceUrl: String(fields.get('sourceUrl') || '').trim(),
         sourceType: draft.sourceType, images: draft.sourceType === 'images' ? images : editing?.images,
-        location: String(fields.get('location') || '').trim(), direction: String(fields.get('direction') || '').trim(), hiringType: String(fields.get('hiringType') || '').trim(),
+        location: String(fields.get('location') || '').trim(), direction: String(fields.get('direction') || '').trim(), hiringType: normalizeHiringType(String(fields.get('hiringType') || '')),
         responsibilities: entries('responsibilities'), requirements: entries('requirements'), warnings: draft.warnings,
         parsedAt: draft.parsedAt, status: editing?.status || '关注中', nextAction: editing?.nextAction || '',
         createdAt: editing?.createdAt || now, updatedAt: now,
@@ -99,7 +100,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
     <form onSubmit={save} className="review-layout"><div className="source-preview"><h3>原始资料</h3>{draft.sourceType === 'images' && images.map((image, index) => <img className="source-image" key={index} src={image.dataUrl} alt={`原始JD截图${index + 1}`} />)}<label>岗位原文<textarea name="rawText" rows={18} required defaultValue={draft.rawText} maxLength={60000} /></label></div>
       <div className="review-fields"><label>岗位名称<input name="title" defaultValue={draft.title} maxLength={200} placeholder="未识别到，可补充或保存为草稿" /></label><label>公司名称<input name="company" defaultValue={draft.company} maxLength={200} /></label><div className="field-pair"><label>地点<input name="location" defaultValue={draft.location} maxLength={300} /></label><label>招聘类型<input name="hiringType" defaultValue={draft.hiringType} maxLength={200} /></label></div>
       <div className="classification-result"><span className="icon-tile"><Icon name="layers" /></span><div><span className="eyebrow">根据工作内容归类</span><h3>{draft.classification ? roleCategories.find(category => category.id === draft.classification?.categoryId)?.name : '保存后可继续分析职位类别'}</h3><p>{draft.classification?.reason || '公司命名各有不同，准备时可以把工作内容相近的岗位放在一起。'}</p>{draft.classification?.evidence.slice(0, 2).map(quote => <blockquote key={quote}>{quote}</blockquote>)}</div></div>
-      <label>调整职位大类<select name="categoryOverride" defaultValue={editing?.categoryOverride || ''}><option value="">使用JD分析结果</option>{roleCategories.map(category => <option key={category.id} value={category.id}>{category.family} · {category.name}</option>)}</select></label>
+      <details><summary>手动调整类别（选填）</summary><label>职位大类<select name="categoryOverride" defaultValue={editing?.categoryOverride || ''}><option value="">使用JD分析结果</option>{roleCategories.map(category => <option key={category.id} value={category.id}>{category.family} · {category.name}</option>)}</select></label></details>
       <label>岗位方向<input name="direction" defaultValue={draft.direction} maxLength={200} placeholder="保留JD中的细分方向，选填" /></label><label>岗位职责<textarea name="responsibilities" rows={5} defaultValue={draft.responsibilities.map((item) => item.text).join('\n')} /></label><label>任职要求<textarea name="requirements" rows={5} defaultValue={draft.requirements.map((item) => item.text).join('\n')} /></label><label>来源链接<input name="sourceUrl" type="url" defaultValue={draft.sourceUrl} /></label>
       <details><summary>查看逐条原文依据</summary>{[...draft.responsibilities, ...draft.requirements].map((item, index) => <blockquote key={index}><strong>{item.text}</strong><p>{item.sourceText}</p></blockquote>)}</details>
       <div className="sticky-actions"><button className="primary" disabled={busy || !ready} type="submit">{busy ? '保存中…' : '保存岗位'}</button></div></div>
