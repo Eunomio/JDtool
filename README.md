@@ -23,7 +23,7 @@ app_port: 7860
 - 文本面试、一次追问和分维度反馈；两项工作任务、同事消息、行动影响与复盘；新JD按职责生成任务，使用简洁的工作沟通风格。
 - 本地数据备份与跨浏览器恢复，6个岗位样本和5个脱敏项目样本。
 
-AI功能需要在服务端配置 `CHAT_ECNU_API_KEY`。招聘网站需要登录、岗位已下线或限制读取时，使用截图或正文继续。示例岗位采用已核对的摘要，最新内容以来源招聘页为准。
+AI功能需要在服务端配置百炼 `DASHSCOPE_API_KEY`，也支持原有 `CHAT_ECNU_API_KEY`。招聘网站需要登录、岗位已下线或限制读取时，使用截图或正文继续。示例岗位采用已核对的摘要，最新内容以来源招聘页为准。
 
 ## 本地运行
 
@@ -54,11 +54,23 @@ node scripts/modelscope.mjs info JDtool
 
 `probe` 只读取账号名称与Docker可用规格。`create` 仅选择明确标记免费的CPU资源并创建私有创空间，`deploy` 触发已有免费空间部署。后两项会修改远程资源。
 
-运行网站需要的模型配置：`CHAT_ECNU_API_KEY`、可选的 `CHAT_ECNU_BASE_URL` 与 `CHAT_ECNU_MODEL`。部署时将密钥写入创空间Secrets，普通配置写入Variables，避免把本地环境文件放进镜像。
+首选百炼：在 `.env.local` 填写北京地域的通用 API Key，其他配置已有默认值：
 
-公司全网搜索另需配置 `BOCHA_API_KEY` 或 `TAVILY_API_KEY`，同时存在时优先使用博查。按各服务的现有套餐与额度使用，不自动购买、充值或启用付费。ChatECNU 对话接口已取消原生联网搜索，开放平台 `/search` 仅覆盖校内资料。参考[ChatECNU说明](https://developer.ecnu.edu.cn/vitepress/llm/api/completions.html)、[博查官方请求示例](https://open.bochaai.com/)和[Tavily接口文档](https://docs.tavily.com/documentation/api-reference/endpoint/search)。
+```dotenv
+DASHSCOPE_API_KEY=填入你的百炼APIKey
+```
 
-保存新岗位后首次打开会自动研究公司，已有结果在本浏览器复用；点击“更新公司研究”重新搜索。一次研究最多两组搜索词、六条公开来源，其中最多四条读取网页正文。没有读到正文时明确标为“搜索摘要”。搜索只使用公司和岗位信息，不包含简历与项目，不使用模型编造的链接。研究支持停止、重试与部分来源保留，沿用140秒总时限、每分钟限额与模型调用额度。网页读取校验公开IP、固定地址并校验跳转；分析条目需匹配来源原句，岗位关联还需引用当前JD要求。
+重启服务后，JD截图识别、岗位分析、项目准备和岗位体验默认使用 `qwen3.8-27b`。`MODEL_PROVIDER=auto` 在百炼 Key 非空时选择百炼，否则沿用 ChatECNU；也可指定 `bailian` 或 `chatecnu`。百炼调用失败不会自动换服务商或模型。`DASHSCOPE_MODEL` 可调整模型名称，替换时需同时确认图片输入、JSON输出和多模态联网搜索能力；`DASHSCOPE_BASE_URL` 默认北京地域兼容接口，也支持该地域业务空间专属域名。原有 `CHAT_ECNU_BASE_URL`、`CHAT_ECNU_MODEL` 继续有效。
+
+百炼原生联网搜索复用同一 Key，无需额外搜索账号。`SEARCH_PROVIDER=auto` 按博查、Tavily、百炼顺序选择已配置的服务，也可指定 `bailian`、`bocha`、`tavily`。百炼采用多模态流式接口与 `turbo` 策略，每次公司研究最多两次搜索请求；只使用接口返回的搜索来源链接，实际读取网页后才分析，无法读取的标题不会被当作业务事实。原生搜索调用同样计入应用每日调用上限和并发上限。参考[百炼联网搜索文档](https://help.aliyun.com/zh/model-studio/web-search)和[结构化输出文档](https://help.aliyun.com/zh/model-studio/qwen-structured-output)。
+
+百炼模型免费额度以控制台所选模型和有效期为准，建议在控制台开启“免费额度用完即停”。联网搜索工具单独计费，不包含在模型免费 Token 额度中；如只使用模型免费额度，可设为 `SEARCH_PROVIDER=disabled` 关闭自动搜索，继续手动补充公司官网资料。参考[免费额度说明](https://help.aliyun.com/zh/model-studio/new-free-quota)。
+
+部署时将 `DASHSCOPE_API_KEY` 写入创空间 Secrets，普通配置写入 Variables，避免把本地环境文件放进镜像。本地填写的密钥不会自动同步到线上。
+
+独立搜索服务仍可使用 `BOCHA_API_KEY` 或 `TAVILY_API_KEY`。ChatECNU 对话接口已取消原生联网搜索，开放平台 `/search` 仅覆盖校内资料。参考[ChatECNU说明](https://developer.ecnu.edu.cn/vitepress/llm/api/completions.html)、[博查官方请求示例](https://open.bochaai.com/)和[Tavily接口文档](https://docs.tavily.com/documentation/api-reference/endpoint/search)。
+
+保存新岗位后首次打开会自动研究公司，已有结果在本浏览器复用；点击“更新公司研究”重新搜索。一次研究最多两组搜索词，交替选择公司业务和岗位场景的结果；最多尝试十个公开网页，遇到登录或读取失败会继续尝试后续来源，最多保留四篇正文、合计六条来源。独立搜索服务提供了真实摘要但没有读到正文时明确标为“搜索摘要”；百炼只有标题和链接的来源需读到正文后才分析。搜索只使用公司和岗位信息，不包含简历与项目，不使用模型编造的链接。研究支持停止、重试与部分来源保留，沿用140秒总时限、每分钟限额与模型调用额度。网页读取校验公开IP、固定地址并校验跳转；分析条目需匹配来源原句，岗位关联还需引用当前JD要求。
 
 尚未配置搜索或服务不可用时，显示重试和补充公司资料入口，岗位编辑、项目准备与练习仍可使用。完整线上搜索验收需要有效的搜索服务密钥。
 

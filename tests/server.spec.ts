@@ -7,6 +7,19 @@ import type { Project, RecommendationResult } from '../lib/database';
 import { researchCompany, groundResearch, type ResearchEvent } from '../lib/company-research';
 import { normalizeHits, webSearch } from '../lib/web-search';
 import { assist } from '../lib/assistant';
+import { modelConfiguration } from '../lib/model-config';
+
+function setEnvironment(values: Record<string, string | undefined>) {
+  const original = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
+  for (const [name, value] of Object.entries(values)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
+  return () => { for (const [name, value] of Object.entries(original)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } };
+}
+
+test.beforeEach(() => {
+  // Never let local credentials influence provider selection in mocked regressions.
+  process.env.MODEL_PROVIDER = 'chatecnu';
+  process.env.SEARCH_PROVIDER = 'tavily';
+});
 
 async function isolateModel() {
   const original = { key: process.env.CHAT_ECNU_API_KEY, base: process.env.CHAT_ECNU_BASE_URL, directory: process.env.APP_DATA_DIR, limit: process.env.DAILY_MODEL_REQUEST_LIMIT };
@@ -146,4 +159,116 @@ test('岗位体验的真实调用提示包含工作沟通规范，提问不会�
     expect(data).toMatchObject({ consequence: '', feedback: null });
     await assist({ action: 'scenario', stage: 'decision', job: { id: 'j1', title: '产品经理', company: '云帆科技', content: '负责需求分析' }, answer: '先确认日志的指标与时间范围' });
   } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test('百炼自动选择使用指定模型，显式指定服务时不会静默回退', () => {
+  expect(modelConfiguration({ DASHSCOPE_API_KEY: ' test-bailian ', CHAT_ECNU_API_KEY: 'test-ecnu' })).toMatchObject({ provider: 'bailian', key: 'test-bailian', model: 'qwen3.8-27b' });
+  expect(modelConfiguration({ DASHSCOPE_API_KEY: ' ', CHAT_ECNU_API_KEY: 'test-ecnu' }).provider).toBe('chatecnu');
+  expect(modelConfiguration({ MODEL_PROVIDER: 'chatecnu', DASHSCOPE_API_KEY: 'test-bailian', CHAT_ECNU_API_KEY: 'test-ecnu' }).provider).toBe('chatecnu');
+  expect(() => modelConfiguration({ MODEL_PROVIDER: 'bailian', CHAT_ECNU_API_KEY: 'test-ecnu' })).toThrow();
+  expect(() => modelConfiguration({ MODEL_PROVIDER: 'typo', CHAT_ECNU_API_KEY: 'test-ecnu' })).toThrow();
+});
+
+test('百炼保留图片输入与结构要求，使用兼容的JSON模式且失败不会换模型', async () => {
+  const restoreModel = await isolateModel(); const originalFetch = globalThis.fetch;
+  const restore = setEnvironment({ MODEL_PROVIDER: 'bailian', DASHSCOPE_API_KEY: 'test-only-bailian', DASHSCOPE_BASE_URL: 'https://bailian.test.invalid/compatible-mode/v1', DASHSCOPE_MODEL: 'qwen3.8-27b' });
+  let calls = 0;
+  try {
+    const content = [{ type: 'text' as const, text: '识别岗位截图' }, { type: 'image_url' as const, image_url: { url: 'data:image/png;base64,dGVzdA==' } }];
+    globalThis.fetch = async (url, options) => {
+      calls++; expect(String(url)).toBe('https://bailian.test.invalid/compatible-mode/v1/chat/completions');
+      expect(options!.headers).toMatchObject({ Authorization: 'Bearer test-only-bailian' });
+      const body = JSON.parse(options!.body as string);
+      expect(body).toMatchObject({ model: 'qwen3.8-27b', enable_thinking: false, response_format: { type: 'json_object' } });
+      expect(body.thinking).toBeUndefined(); expect(body.enable_search).toBeUndefined();
+      expect(body.messages[1].content).toEqual(content);
+      if (calls === 1) expect(body.messages[0].content).toContain('"required":["title"]');
+      return calls === 1 ? Response.json({ choices: [{ message: { content: '{"title":"产品经理"}' } }] }) : Response.json({ error: 'test-only-bailian secret upstream' }, { status: 401 });
+    };
+    expect(await modelJson('识别', content, { type: 'object', required: ['title'] })).toEqual({ title: '产品经理' });
+    await expect(modelJson('识别', content)).rejects.toThrow('暂时无法完成解析');
+    expect(calls).toBe(2);
+  } finally { globalThis.fetch = originalFetch; restore(); restoreModel(); }
+});
+
+test('百炼搜索跨分片读取真实来源，忽略回答内的虚构链接，并计入每日额度', async () => {
+  const restoreModel = await isolateModel(); const originalFetch = globalThis.fetch;
+  const restore = setEnvironment({ SEARCH_PROVIDER: 'bailian', DASHSCOPE_API_KEY: 'test-only-bailian', DASHSCOPE_BASE_URL: 'https://bailian.test.invalid/compatible-mode/v1', DASHSCOPE_MODEL: 'qwen3.8-27b', DAILY_MODEL_REQUEST_LIMIT: '1' });
+  let calls = 0;
+  try {
+    globalThis.fetch = async (url, options) => {
+      calls++; expect(String(url)).toBe('https://bailian.test.invalid/api/v1/services/aigc/multimodal-generation/generation');
+      expect(options!.headers).toMatchObject({ 'X-DashScope-SSE': 'enable' });
+      const body = JSON.parse(options!.body as string);
+      expect(body.parameters).toMatchObject({ enable_search: true, enable_thinking: false, search_options: { search_strategy: 'turbo', forced_search: true, enable_source: true } });
+      expect(JSON.stringify(body.input)).toContain('云帆科技'); expect(JSON.stringify(body.input)).not.toContain('项目经历');
+      const event = { output: { search_info: { search_results: [{ title: '云帆科技官网', url: 'https://example.com/about?utm_source=bailian' }, { title: '重复', url: 'https://example.com/about' }, { title: '危险', url: 'javascript:alert(1)' }] }, choices: [{ message: { content: '虚构 https://made-up.invalid/' } }] } };
+      const bytes = new TextEncoder().encode(`event:result\r\ndata:${JSON.stringify(event)}\r\n\r\ndata:[DONE]\n\n`);
+      return new Response(new ReadableStream({ start(controller) { for (let index = 0; index < bytes.length; index += 7) controller.enqueue(bytes.slice(index, index + 7)); controller.close(); } }));
+    };
+    expect(await webSearch('云帆科技 公司业务', new AbortController().signal)).toEqual([{ title: '云帆科技官网', url: 'https://example.com/about', snippet: '', requiresReading: true }]);
+    await expect(webSearch('云帆科技 公司业务', new AbortController().signal)).rejects.toThrow('今天的使用次数'); expect(calls).toBe(1);
+  } finally { globalThis.fetch = originalFetch; restore(); restoreModel(); }
+});
+
+test('百炼只有来源标题且网页读取失败时，不会生成公司业务事实', async () => {
+  const restore = setEnvironment({ SEARCH_PROVIDER: 'tavily', TAVILY_API_KEY: 'test-only-search' }); let calls = 0;
+  try {
+    await expect(researchCompany({ job: { id: 'native-j1', company: '云帆科技', title: '产品经理' } }, () => {}, {
+      search: async () => [{ title: '云帆科技协作产品', url: 'https://example.com/', snippet: '', requiresReading: true }],
+      validate: async () => ({ url: new URL('https://example.com/'), addresses: [{ address: '93.184.216.34', family: 4 }] }),
+      read: async () => { throw new Error('page unavailable'); },
+      json: async () => { calls++; return { keywords: ['官网'] }; },
+    })).rejects.toThrow('没有找到可读取的公开资料');
+    expect(calls).toBe(1);
+  } finally { restore(); }
+});
+
+test('百炼流内错误不泄露响应正文，取消后不发送请求', async () => {
+  const restoreModel = await isolateModel(); const originalFetch = globalThis.fetch;
+  const restore = setEnvironment({ SEARCH_PROVIDER: 'bailian', DASHSCOPE_API_KEY: 'test-only-bailian', DASHSCOPE_BASE_URL: 'https://bailian.test.invalid/compatible-mode/v1' }); let calls = 0;
+  try {
+    globalThis.fetch = async () => { calls++; return new Response('data:{"code":"InvalidApiKey","message":"test-only-bailian sensitive"}\n\n'); };
+    await expect(webSearch('云帆科技', new AbortController().signal)).rejects.toThrow('这次搜索未完成');
+    const controller = new AbortController(); controller.abort();
+    await expect(webSearch('云帆科技', controller.signal)).rejects.toThrow(); expect(calls).toBe(1);
+  } finally { globalThis.fetch = originalFetch; restore(); restoreModel(); }
+});
+
+test('公司介绍结果较多时，岗位搜索来源仍会读取并用于分析', async () => {
+  const restore = setEnvironment({ SEARCH_PROVIDER: 'tavily', TAVILY_API_KEY: 'test-only-search' }); let calls = 0;
+  const text = '云帆科技提供企业会议记录与团队协作产品。'; const readUrls: string[] = [];
+  try {
+    const result = await researchCompany({ job: { id: 'balanced-j1', company: '云帆科技', title: '产品经理', requirements: [{ id: 'r1', text: '调研会议协作需求' }] } }, () => {}, {
+      search: async (query) => query.includes('岗位方向') ? [{ title: '会议协作产品', url: 'https://example.org/role', snippet: '', requiresReading: true }] : Array.from({ length: 10 }, (_, index) => ({ title: `公司介绍${index}`, url: `https://example.com/about-${index}`, snippet: '', requiresReading: true })),
+      validate: async (url) => ({ url: new URL(url), addresses: [{ address: '93.184.216.34', family: 4 }] }),
+      read: async (url) => { readUrls.push(url); return { status: 200, headers: { 'content-type': 'text/html' }, url, body: Buffer.from(`<html><body>${text.repeat(20)}</body></html>`) }; },
+      json: async (_system, content) => {
+        if (++calls === 1) return { keywords: ['主营业务', '岗位方向'] };
+        const { sources } = JSON.parse(content as string);
+        const source = sources.find((row: { url: string }) => row.url === 'https://example.org/role'); expect(source).toBeTruthy();
+        const row = { text: '调研企业会议协作需求', reason: '关联产品用户场景', requirementIds: ['r1'], sourceIds: [source.id], quotes: [{ sourceId: source.id, quote: text }] };
+        return { identityMatched: true, identityNote: '匹配', facts: [row], businesses: [], roleInsights: [row], hypotheses: [], questions: [] };
+      },
+    });
+    expect(readUrls).toHaveLength(4); expect(readUrls[1]).toBe('https://example.org/role'); expect(result.data.roleInsights).toHaveLength(1);
+  } finally { restore(); }
+});
+
+test('前排网页无法读取时继续尝试后续原生搜索来源，最多读取十个候选', async () => {
+  const restore = setEnvironment({ SEARCH_PROVIDER: 'tavily', TAVILY_API_KEY: 'test-only-search' }); let calls = 0; let reads = 0;
+  const text = '云帆科技提供企业会议记录与团队协作产品。';
+  try {
+    const result = await researchCompany({ job: { id: 'fallback-j1', company: '云帆科技', title: '产品经理' } }, () => {}, {
+      search: async () => Array.from({ length: 10 }, (_, index) => ({ title: `公司资料${index}`, url: `https://example.com/page-${index}`, snippet: '', requiresReading: true })),
+      validate: async (url) => ({ url: new URL(url), addresses: [{ address: '93.184.216.34', family: 4 }] }),
+      read: async (url) => { reads++; if (!url.endsWith('page-9')) throw new Error('login required'); return { status: 200, headers: { 'content-type': 'text/html' }, url, body: Buffer.from(`<html><body>${text.repeat(20)}</body></html>`) }; },
+      json: async (_system, content) => {
+        if (++calls === 1) return { keywords: ['官网'] };
+        const { sources } = JSON.parse(content as string); expect(sources).toHaveLength(1);
+        return { identityMatched: true, identityNote: '匹配', facts: [{ text: '会议记录与团队协作产品', reason: '公司业务', requirementIds: [], sourceIds: [sources[0].id], quotes: [{ sourceId: sources[0].id, quote: text }] }], businesses: [], roleInsights: [], hypotheses: [], questions: [] };
+      },
+    });
+    expect(reads).toBe(10); expect(result.sources[0].url).toBe('https://example.com/page-9'); expect(result.data.facts).toHaveLength(1);
+  } finally { restore(); }
 });
