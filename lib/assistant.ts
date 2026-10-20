@@ -31,7 +31,7 @@ export const assistInput = z.object({
   action: z.enum(['projects', 'recommendations', 'preparation', 'company', 'compare', 'interview', 'scenario', 'exercise']),
   job: jobInput.optional(), jobs: z.array(jobInput).max(3).optional(), projects: z.array(projectInput).max(40).optional(), sources: z.array(sourceInput).max(15).optional(),
   text: z.string().max(80000).optional(), preference: ids.optional(), outputModes: z.array(z.string()).optional(), maxProjects: z.number().int().min(1).max(3).optional(),
-  stage: z.string().max(100).optional(), context: z.string().max(40000).optional(), answer: z.string().max(20000).optional(), supplement: z.string().max(20000).optional(), mode: z.string().optional(),
+  stage: z.string().max(100).optional(), context: z.string().max(40000).optional(), answer: z.string().max(20000).optional(), supplement: z.string().max(20000).optional(), followup: z.string().max(8000).optional(), mode: z.string().optional(),
 });
 type AssistInput = z.infer<typeof assistInput>;
 
@@ -62,6 +62,8 @@ async function generate<T extends z.ZodType>(schema: T, prompt: string, input: A
 }
 
 export async function assist(input: AssistInput) {
+  if (input.action === 'interview' && (input.stage !== 'followup' && input.stage !== 'review')) throw new AppError(400, 'INVALID_STAGE', '请先回答题目，再完成追问与复盘。');
+  if (input.action === 'interview' && input.stage === 'review' && (!input.followup?.trim() || !input.answer?.trim() || !input.supplement?.trim())) throw new AppError(400, 'MISSING_FOLLOWUP', '请完成题目与追问的回答后再查看复盘。');
   for (const job of [input.job, ...(input.jobs || [])]) {
     if (job && !job.requirements?.length && !job.responsibilities?.length) job.requirements = [{ id: `${job.id}-original`, text: job.content, sourceText: job.content }];
   }
@@ -132,7 +134,7 @@ export async function assist(input: AssistInput) {
   }
   if (input.action === 'interview') return generate(interviewOutput, input.stage === 'followup'
     ? '阅读基础题、岗位能力与候选人回答，针对最影响方案质量的1—2处提出一次具体追问。followup写追问，feedback=null，不提前给最终答案。'
-    : '综合题目、首次回答和补充回答给分维度复盘。followup为空，feedback含做得好的点、维度反馈、值得补充的点、改进回答提纲和下一步练习。每个维度关联当前岗位的要求ID；反馈基于实际回答，不推断人格或录用概率。', input);
+    : '结合context中的原题、answer首次回答、followup实际追问、supplement补充回答，按完整对话给分维度复盘。输出followup为空，feedback含做得好的点、维度反馈、值得补充的点、改进回答提纲和下一步练习。每个维度关联当前岗位的要求ID；反馈基于实际回答，不推断人格或录用概率。', input);
   return generate(scenarioOutput, input.stage === 'review'
     ? '这是两决策点工作情境的最终复盘。结合全部选择、角色对话和后果评价岗位能力，dialogue和consequence为空，feedback填写分维度复盘与下一步。剧情事件和数据都是模拟材料，不写成公司真实事件或用户已有经历。'
     : '你扮演情境中当前同事，根据任务和用户行动作一轮有信息量的回应。dialogue是同事发言，consequence是该选择的具体后果或新约束，反馈与已选行动一致；保留模板的两决策点顺序，不替用户做下一决定。feedback=null。数字仅用于明确的模拟任务，不断言公司实际发生。', input);

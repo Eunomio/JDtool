@@ -1,8 +1,10 @@
 import type { Job, Project } from './database';
 
 export async function api<T>(path: string, input: unknown): Promise<T> {
-  const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(180_000) });
-  const result = await response.json();
+  let response: Response;
+  try { response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(180_000) }); }
+  catch { throw new Error('连接等待较久，输入资料已保留，请稍后重试。'); }
+  const result = await response.json().catch(() => { throw new Error('暂时无法完成，输入资料已保留，请稍后重试。'); });
   if (!response.ok) throw new Error(result.error?.message || '暂时无法完成，请重试。');
   return result as T;
 }
@@ -16,7 +18,20 @@ export function inputVersion(job: Job, projects: Project[] = [], sources: { id: 
 
 export function displayText(value: string, project: Project) {
   if (project.visibility !== 'display') return value;
-  return project.redactions.reduce((text, rule) => rule.from ? text.replaceAll(rule.from, rule.to || '已隐藏') : text, value);
+  return redactText(value, project.redactions);
+}
+
+export function displayProjectText(value: string, projects: Project[]) {
+  return redactText(value, projects.filter((project) => project.visibility === 'display').flatMap((project) => project.redactions));
+}
+
+function redactText(value: string, rules: { from: string; to: string }[]) {
+  const replacements = new Map(rules.filter((rule) => rule.from).map((rule) => [rule.from, rule.to || '已隐藏']));
+  if (!replacements.size) return value;
+  const protectedValues = new Set(replacements.values());
+  const terms = [...new Set([...replacements.keys(), ...protectedValues])].sort((a, b) => b.length - a.length);
+  const pattern = terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return value.replace(new RegExp(pattern, 'g'), (match) => replacements.get(match) ?? match);
 }
 
 export function safeProject(project: Project) {

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { database, type CompareResult, type Job, type Project, type SavedResult, type Source } from '../lib/database';
 import { api, inputVersion, modelProjects } from '../lib/client';
 import { AdviceList } from './evidence';
+import { saveProjectResult } from '../lib/project-storage';
 
 export default function Comparison({ jobs, projects, sources, addTask }: { jobs: Job[]; projects: Project[]; sources: Source[]; addTask: (text: string, jobIds: string[]) => void }) {
   const [mode, setMode] = useState('similar');
@@ -18,7 +19,7 @@ export default function Comparison({ jobs, projects, sources, addTask }: { jobs:
   const directions = [...new Set(jobs.map((job) => job.direction).filter(Boolean))] as string[];
   async function generate() {
     setBusy(true); setError('');
-    try { const data = await api<CompareResult>('/api/assist', { action: 'compare', jobs: selectedJobs, projects: modelProjects(projects), sources: sources.filter((source) => selected.includes(source.jobId || '')), mode }); const saved = { id: crypto.randomUUID(), jobId: selected.join('|'), inputVersion: version, data, createdAt: new Date().toISOString() }; await database.comparisons.put(saved); setResult(saved); }
+    try { const data = await api<CompareResult>('/api/assist', { action: 'compare', jobs: selectedJobs, projects: modelProjects(projects), sources: sources.filter((source) => selected.includes(source.jobId || '')), mode }); const saved = { id: crypto.randomUUID(), jobId: selected.join('|'), inputVersion: version, data, createdAt: new Date().toISOString() }; await saveProjectResult('comparisons', saved, projects); setResult(saved); }
     catch (error) { setError(error instanceof Error ? error.message : '比较未完成，请重试。'); }
     finally { setBusy(false); }
   }

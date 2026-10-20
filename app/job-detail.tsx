@@ -4,6 +4,7 @@ import { database, statuses, type CompanyResult, type Job, type JobStatus, type 
 import { api, inputVersion, modelProjects } from '../lib/client';
 import { AdviceList } from './evidence';
 import ProjectBuilder from './project-builder';
+import { saveProjectResult } from '../lib/project-storage';
 
 export default function JobDetail({ job, projects, sources, refresh, onEdit, onPractice, addTask }: { job: Job; projects: Project[]; sources: Source[]; refresh: () => Promise<void>; onEdit: (job: Job) => void; onPractice: (mode: 'interview' | 'scenario', jobId: string) => void; addTask: (text: string, jobIds: string[]) => void }) {
   const [preparation, setPreparation] = useState<SavedResult<PreparationResult> | null>(null);
@@ -19,7 +20,7 @@ export default function JobDetail({ job, projects, sources, refresh, onEdit, onP
 
   async function run(name: string, action: () => Promise<void>) { setBusy(name); setError(''); try { await action(); } catch (error) { setError(error instanceof Error ? error.message : '暂时无法完成，请重试。'); } finally { setBusy(''); } }
   async function update(change: Partial<Job>) { await run('saving', async () => { await database.jobs.update(job.id, { ...change, updatedAt: new Date().toISOString() }); await refresh(); }); }
-  async function generatePreparation() { await run('preparation', async () => { const data = await api<PreparationResult>('/api/assist', { action: 'preparation', job, projects: modelProjects(projects), sources: jobSources }); const result = { id: crypto.randomUUID(), jobId: job.id, inputVersion: version, createdAt: new Date().toISOString(), data }; await database.preparations.put(result); setPreparation(result); }); }
+  async function generatePreparation() { await run('preparation', async () => { const data = await api<PreparationResult>('/api/assist', { action: 'preparation', job, projects: modelProjects(projects), sources: jobSources }); const result = { id: crypto.randomUUID(), jobId: job.id, inputVersion: version, createdAt: new Date().toISOString(), data }; await saveProjectResult('preparations', result, projects); setPreparation(result); }); }
   async function generateCompany() { await run('company', async () => { const data = await api<CompanyResult>('/api/assist', { action: 'company', job, sources: jobSources }); const result = { id: crypto.randomUUID(), jobId: job.id, inputVersion: version, createdAt: new Date().toISOString(), data }; await database.companies.put(result); setCompany(result); }); }
 
   return <div className="page-stack"><section className="panel"><div className="section-heading"><div><p className="eyebrow">{job.company} {job.sample ? '· 示例岗位' : ''}</p><h1>{job.title}</h1><p className="muted">{[job.direction, job.location, job.hiringType].filter(Boolean).join(' · ') || '可继续补充岗位信息'}</p></div><button className="secondary" onClick={() => onEdit(job)}>编辑JD</button></div>

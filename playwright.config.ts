@@ -10,8 +10,9 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
+    { name: 'desktop', testIgnore: '**/server.spec.ts', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile', testIgnore: '**/server.spec.ts', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
+    { name: 'server', testMatch: '**/server.spec.ts' },
   ],
   webServer: {
     command: 'npm start',

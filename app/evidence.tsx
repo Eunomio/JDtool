@@ -1,6 +1,6 @@
 'use client';
 import type { Advice, Job, Project, Source } from '../lib/database';
-import { displayText } from '../lib/client';
+import { displayText, displayProjectText } from '../lib/client';
 
 export function Evidence({ item, jobs, projects, sources }: { item: Pick<Advice, 'requirementIds' | 'factIds' | 'sourceIds'>; jobs: Job[]; projects: Project[]; sources: Source[] }) {
   const requirements = jobs.flatMap((job) => [...(job.requirements || []), ...(job.responsibilities || []), { id: `${job.id}-original`, text: job.content, sourceText: job.content }].map((requirement) => ({ ...requirement, job })));
@@ -13,5 +13,5 @@ export function Evidence({ item, jobs, projects, sources }: { item: Pick<Advice,
 }
 
 export function AdviceList({ title, items, jobs, projects, sources, addTask }: { title: string; items: Advice[]; jobs: Job[]; projects: Project[]; sources: Source[]; addTask?: (text: string) => void }) {
-  return <section className="advice-section"><h3>{title}</h3>{!items.length && <p className="muted">可补充资料后继续生成。</p>}{items.map((item, index) => <div className="advice-item" key={index}><strong>{item.text}</strong><p>{item.reason}</p><Evidence item={item} jobs={jobs} projects={projects} sources={sources} />{addTask && <button className="text-button" onClick={() => addTask(item.text)}>加入我的计划</button>}</div>)}</section>;
+  return <section className="advice-section"><h3>{title}</h3>{!items.length && <p className="muted">可补充资料后继续生成。</p>}{items.map((item, index) => <div className="advice-item" key={index}><strong>{displayProjectText(item.text, projects)}</strong><p>{displayProjectText(item.reason, projects)}</p><Evidence item={item} jobs={jobs} projects={projects} sources={sources} />{addTask && <button className="text-button" onClick={() => addTask(item.text)}>加入我的计划</button>}</div>)}</section>;
 }
