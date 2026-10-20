@@ -1,0 +1,12 @@
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!next-env.d.ts
+!next.config.ts
+!app/
+!app/**
+!lib/
+!lib/**
+!scripts/
+!scripts/prepare-standalone.mjs

@@ -1,0 +1,12 @@
+# 本地环境配置与凭据
+.env
+.env.*
+!.env.example
+.local/
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
