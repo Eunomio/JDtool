@@ -4,9 +4,6 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { AccountUser } from '../lib/account-types';
 import type { AccountSync } from '../lib/account-sync';
 import MobileNavigation from './mobile-navigation';
-import { readLegacyData, personalLegacyData, importLegacyData, downloadLegacyData } from '../lib/legacy-data';
-import type { WorkspaceData } from '../lib/workspace-data';
-import { accountStorageKey } from '../lib/database';
 import { database, statuses, type Job, type JobStatus, type Project, type Source, type Task } from '../lib/database';
 import { sampleJobs, sampleSources } from '../lib/samples';
 import JobImporter from './job-importer';
@@ -31,10 +28,6 @@ const journey = [{ title: '读懂机会', icon: 'globe', text: '岗位与公司�
 
 export default function Workbench({ account, sync, onLogout }: { account: AccountUser; sync: AccountSync; onLogout: () => Promise<void> }) {
   const saveStatus = useSyncExternalStore(sync.subscribe, sync.getStatus, sync.getStatus);
-  const [legacy, setLegacy] = useState<WorkspaceData | null>(null);
-  const [importingLegacy, setImportingLegacy] = useState(false);
-  useEffect(() => { if (!localStorage.getItem(accountStorageKey('legacy-imported'))) void readLegacyData().then(setLegacy).catch(() => {}); }, []);
-  const personalLegacy = legacy && (account.role === 'admin' ? legacy : personalLegacyData(legacy));
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
@@ -123,7 +116,6 @@ export default function Workbench({ account, sync, onLogout }: { account: Accoun
     <div className="app-shell"><aside className="sidebar"><div className="nav-caption">你的机会空间</div><nav aria-label="主要导航">{nav.map(([key, label]) => <button key={key} title={label} aria-label={label} aria-current={page === key ? 'page' : undefined} className={page === key ? 'active' : ''} onClick={() => key === 'detail' && (selected || jobs[0]) ? open(selected || jobs[0], detailStage) : navigate(key)}><Icon name={key === 'categories' ? 'layers' : key} /><span>{label}</span>{key === 'jobs' && !!jobs.length && <small>{jobs.length}</small>}</button>)}</nav><div className="sidebar-note"><Icon name="target" size={26} /><span className="sidebar-note-mark">每一次准备，都算数</span><p>把下一步变小一点，<br />把自己的优势讲清楚。</p><span>{projects.filter((project) => project.confirmed).length}个已确认项目 · {completed}项已完成</span></div></aside>
     <main className="app-main" id="workspace-main">{error && <div className="notice error" role="alert">{error}</div>}{message && <div className="notice toast" role="status"><span>{message}</span><button className="text-button" aria-label="关闭提示" onClick={() => setMessage('')}>×</button></div>}{deleted && <div className="notice" role="status">已删除“{deleted.job.title}”<button className="text-button" onClick={undo}>撤销</button><button className="text-button" onClick={() => setDeleted(null)}>关闭</button></div>}
       {(saveStatus.state === 'error' || saveStatus.state === 'conflict') && <div className="notice account-sync-notice" role="alert"><span>{saveStatus.message}</span><button className="secondary small" onClick={() => void sync.flush(true).catch(() => {})}>重试保存</button>{saveStatus.state === 'conflict' && <button className="secondary small" onClick={() => { if (window.confirm('建议先通过资料备份导出本页内容。重新读取会使用账号中已保存的资料，继续吗？')) void sync.reload().catch(() => {}); }}>重新读取账号资料</button>}</div>}
-      {page === 'home' && legacy && personalLegacy && (personalLegacy.jobs.length > 0 || personalLegacy.projects.length > 0) && <div className="notice account-sync-notice"><span>此浏览器里还有{personalLegacy.jobs.length}个旧岗位、{personalLegacy.projects.length}个旧项目，可以导入到当前账号。</span><button className="primary small" disabled={importingLegacy} onClick={async () => { setImportingLegacy(true); try { await importLegacyData(personalLegacy); await refresh(); await sync.flush(); localStorage.setItem(accountStorageKey('legacy-imported'), 'yes'); setLegacy(null); setMessage('旧资料已保存到当前账号。'); } catch { setError('旧资料尚未全部保存，可以导出备份后重试。'); } finally { setImportingLegacy(false); } }}>{importingLegacy ? '正在导入…' : '导入旧资料'}</button><button className="secondary small" onClick={() => downloadLegacyData(legacy)}>导出旧资料</button></div>}
       {page !== 'categories' && roleAnalysis.busy && <div className="notice" role="status"><Icon name="sparkles" size={17} />正在自动整理岗位类别 {roleAnalysis.completed}/{roleAnalysis.total}<button className="secondary small" onClick={roleAnalysis.stop}>停止分析</button></div>}
       {page !== 'categories' && roleAnalysis.error && <div className="notice"><span>{roleAnalysis.error}</span><button className="secondary small" onClick={() => navigate('categories')}>查看岗位归类</button></div>}
       {page === 'import' && <><button className="text-button back-button" onClick={() => navigate(selected ? 'detail' : 'jobs')}>返回{selected ? '岗位详情' : '岗位清单'}</button><JobImporter key={editing?.id || 'new'} ready={ready} editing={editing} onCancel={() => navigate(selected ? 'detail' : 'jobs')} onOpen={open} onSaved={async (job) => { await refresh(); chooseJob(job.id); setEditing(null); setDetailStage('understand'); setResumeProjects(false); navigate('detail'); setMessage('岗位已保存，开始了解公司与业务。'); window.scrollTo({ top: 0 }); }} /></>}

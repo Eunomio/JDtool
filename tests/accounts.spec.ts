@@ -1,4 +1,5 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { retiredImportedJobIds } from '../lib/legacy-cleanup';
 
 const username = () => `U${crypto.randomUUID().replaceAll('-', '').slice(0, 18)}`;
 async function isolate(context: BrowserContext) {
@@ -87,14 +88,32 @@ test('网络暂时不可用时保留岗位，恢复连接并刷新后继续保�
   finally { await other.close(); }
 });
 
-test('导入旧版个人岗位时排除示例，原浏览器旧资料仍完整保留', async ({ page }) => {
+test('清理两条旧导入及关联资料，旧浏览器岗位不向新账号提供导入', async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(async () => {
+  await page.evaluate(async retiredIds => {
     const now = new Date().toISOString();
-    const db = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open('jdtool', 1); request.onupgradeneeded = () => request.result.createObjectStore('jobs', { keyPath: 'id' }); request.onsuccess = () => resolve(request.result); });
-    await new Promise<void>(resolve => { const tx = db.transaction('jobs', 'readwrite'); const table = tx.objectStore('jobs'); const job = { id: 'legacy-personal', title: '旧版个人岗位', company: '旧版公司', content: '负责用户研究和需求分析工作，并制定产品改进方案。', status: '面试中', nextAction: '', createdAt: now, updatedAt: now }; table.put(job); table.put({ ...job, id: 'sample-old', title: '旧版示例岗位', sample: true }); tx.oncomplete = () => resolve(); }); db.close();
+    const db = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open('jdtool', 1); request.onupgradeneeded = () => { for (const name of ['jobs', 'projects', 'sources', 'comparisons', 'tasks']) request.result.createObjectStore(name, { keyPath: 'id' }); }; request.onsuccess = () => resolve(request.result); });
+    await new Promise<void>(resolve => {
+      const tx = db.transaction(['jobs', 'projects', 'sources', 'comparisons', 'tasks'], 'readwrite'); const table = tx.objectStore('jobs'); const job = { id: 'legacy-personal', title: '旧版个人岗位', company: '旧版公司', content: '负责用户研究和需求分析工作，并制定产品改进方案。', status: '面试中', nextAction: '', createdAt: now, updatedAt: now }; table.put(job); table.put({ ...job, id: 'sample-old', title: '旧版示例岗位', sample: true });
+      for (const id of retiredIds) { table.put({ ...job, id }); tx.objectStore('sources').put({ id, jobId: id }); }
+      tx.objectStore('projects').put({ id: 'keep-project' }); tx.objectStore('sources').put({ id: 'keep-source', jobId: job.id });
+      tx.objectStore('comparisons').put({ id: 'remove-comparison', jobId: `${retiredIds[0]}|${job.id}` });
+      tx.objectStore('tasks').put({ id: 'remove-task', jobIds: [...retiredIds] }); tx.objectStore('tasks').put({ id: 'keep-task', jobIds: [retiredIds[0], job.id] });
+      tx.oncomplete = () => resolve();
+    }); db.close();
+  }, retiredImportedJobIds);
+  for (let index = 0; index < 2; index++) {
+    await signIn(page, username());
+    await expect(page.getByRole('button', { name: '导入旧资料', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '导出旧资料', exact: true })).toHaveCount(0);
+    await nav(page, '岗位清单'); await expect(page.getByRole('button', { name: '旧版个人岗位', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: '旧版示例岗位', exact: true })).toHaveCount(0);
+    const saved = await page.evaluate(async () => (await (await fetch('/api/workspace', { headers: { 'X-Account-Id': localStorage.getItem('jdtool-active-account')! } })).json()).data);
+    expect(saved.jobs).toEqual([]); expect(saved.projects).toEqual([]);
+    await page.locator('.account-menu > summary').click(); await page.getByRole('button', { name: '退出登录', exact: true }).click(); await expect(page.getByRole('heading', { name: '欢迎回来', exact: true })).toBeVisible();
+  }
+  const remaining = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open('jdtool'); request.onsuccess = () => resolve(request.result); });
+    try { return await Promise.all(['jobs', 'projects', 'sources', 'comparisons', 'tasks'].map(name => new Promise<any[]>(resolve => { const request = db.transaction(name).objectStore(name).getAll(); request.onsuccess = () => resolve(request.result); }))); } finally { db.close(); }
   });
-  await signIn(page, username()); await expect(page.getByRole('button', { name: '导入旧资料', exact: true })).toBeVisible(); await page.getByRole('button', { name: '导入旧资料', exact: true }).click(); await expect(page.getByText('旧资料已保存到当前账号。', { exact: true })).toBeVisible();
-  await nav(page, '岗位清单'); await expect(page.getByRole('button', { name: '旧版个人岗位', exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: '旧版示例岗位', exact: true })).toHaveCount(0);
-  expect(await page.evaluate(async () => { const db = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open('jdtool'); request.onsuccess = () => resolve(request.result); }); try { return await new Promise<number>(resolve => { const request = db.transaction('jobs').objectStore('jobs').count(); request.onsuccess = () => resolve(request.result); }); } finally { db.close(); } })).toBe(2);
+  expect(remaining[0].map(row => row.id).sort()).toEqual(['legacy-personal', 'sample-old']); expect(remaining[1]).toEqual([{ id: 'keep-project' }]); expect(remaining[2]).toEqual([{ id: 'keep-source', jobId: 'legacy-personal' }]); expect(remaining[3]).toEqual([]); expect(remaining[4]).toEqual([{ id: 'keep-task', jobIds: ['legacy-personal'] }]);
 });

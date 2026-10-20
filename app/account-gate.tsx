@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AccountUser } from '../lib/account-types';
 import { AccountSync, readWorkspace } from '../lib/account-sync';
+import { discardLegacyImports } from '../lib/legacy-cleanup';
 import Workbench from './workbench';
 import { Icon } from './ui';
 
@@ -39,6 +40,7 @@ export default function AccountGate() {
     window.addEventListener('jdtool-account-changed', changed); window.addEventListener('storage', storage);
     void (async () => {
       try {
+        await discardLegacyImports().catch(() => {});
         const response = await fetch('/api/auth/session', { cache: 'no-store', signal: AbortSignal.timeout(30000) });
         if (!response.ok) throw new Error('暂时无法读取账号，请重试。');
         const result = await response.json(); if (cancelled) return;
