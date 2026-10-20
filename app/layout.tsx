@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './experience.css';
 
 export const metadata: Metadata = {
   title: '岗位探索与求职准备助手',

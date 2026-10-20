@@ -8,6 +8,10 @@ import { researchCompany, groundResearch, type ResearchEvent } from '../lib/comp
 import { normalizeHits, webSearch } from '../lib/web-search';
 import { assist } from '../lib/assistant';
 import { modelConfiguration } from '../lib/model-config';
+import { groundClassification, classifyJobs } from '../lib/role-classification';
+import { categoryFor, roleInputVersion } from '../lib/role-taxonomy';
+import { parseJob } from '../lib/job-parser';
+import { parseBackup } from '../lib/backup';
 
 function setEnvironment(values: Record<string, string | undefined>) {
   const original = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
@@ -271,4 +275,48 @@ test('前排网页无法读取时继续尝试后续原生搜索来源，最多�
     });
     expect(reads).toBe(10); expect(result.sources[0].url).toBe('https://example.com/page-9'); expect(result.data.facts).toHaveLength(1);
   } finally { restore(); }
+});
+
+test('分类必须引用JD正文，无依据结果与修改过JD的旧分类归为待确认', () => {
+  const job = { title: '交互设计师', content: '负责用户访谈和实验设计，采集行为数据并使用统计方法验证研究假设。' };
+  const valid = groundClassification({ categoryId: 'user_research', confidence: 'high', reason: '实际工作是研究实验', evidence: ['负责用户访谈和实验设计'] }, job)!;
+  expect(categoryFor({ ...job, classification: valid }).id).toBe('user_research');
+  expect(categoryFor({ ...job, content: '负责服务端接口与数据库开发。', classification: valid }).id).toBe('undetermined');
+  const fabricated = groundClassification({ categoryId: 'experience_design', confidence: 'high', reason: '岗位名称包含交互', evidence: ['设计交互原型并验证用户流程'] }, job)!;
+  expect(fabricated.categoryId).toBe('undetermined'); expect(fabricated.evidence).toEqual([]);
+  expect(categoryFor({ ...job, classification: fabricated, categoryOverride: 'experience_design' }).id).toBe('experience_design');
+});
+
+test('解析JD同时保留原岗位名称，并将有正文依据的职位分类带回校对页面', async () => {
+  const restore = await isolateModel(); const originalFetch = globalThis.fetch;
+  const content = '公司：测试公司。岗位：体验设计师。负责用户流程和交互原型设计，开展可用性测试。';
+  try {
+    globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ isJobPosting: true, rawText: '', title: '体验设计师', company: '测试公司', location: '', direction: '交互体验', hiringType: '', responsibilities: [{ text: '用户流程和原型设计', sourceText: '负责用户流程和交互原型设计' }], requirements: [], warnings: [], classification: { categoryId: 'experience_design', confidence: 'high', reason: '工作内容为流程与原型设计', evidence: ['负责用户流程和交互原型设计'] } }) } }] });
+    const result = await parseJob(content);
+    expect(result.title).toBe('体验设计师'); expect(result.classification?.categoryId).toBe('experience_design');
+    expect(result.classification?.inputVersion).toBe(roleInputVersion({ ...result, content }));
+  } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test('批量归类拒绝未请求的编号和重复编号，不把另一份JD的分类套到当前岗位', async () => {
+  const restore = await isolateModel(); const originalFetch = globalThis.fetch;
+  const job = { id: 'role-j1', title: '体验设计师', content: '负责用户任务流程和交互原型设计，并开展可用性测试。' };
+  const classification = { categoryId: 'experience_design', confidence: 'high', reason: '流程和原型设计', evidence: ['负责用户任务流程和交互原型设计'] };
+  try {
+    globalThis.fetch = async () => Response.json({ choices: [{ message: { content: JSON.stringify({ classifications: [{ jobId: 'not-requested', classification }, { jobId: job.id, classification }, { jobId: job.id, classification }] }) } }] });
+    await expect(classifyJobs({ jobs: [job] })).rejects.toThrow('有依据的归类结果');
+  } finally { globalThis.fetch = originalFetch; restore(); }
+});
+
+test('备份保留分类依据和手动合并记录，拒绝损坏的职位分类', () => {
+  const job = { id: 'backup-role', title: '体验设计师', company: '测试公司', content: '负责用户流程与原型设计。', status: '关注中', nextAction: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), categoryOverride: 'experience_design', classification: { categoryId: 'experience_design', confidence: 'high', reason: '流程设计', evidence: ['负责用户流程与原型设计'], inputVersion: 'current', classifiedAt: new Date().toISOString() } };
+  const backup = { format: 'jdtool-backup', version: 2, jobs: [job] };
+  expect(parseBackup(backup).jobs[0].classification?.evidence).toEqual(job.classification.evidence);
+  expect(parseBackup(backup).jobs[0].categoryOverride).toBe('experience_design');
+  expect(() => parseBackup({ ...backup, jobs: [{ ...job, classification: { ...job.classification, categoryId: 'fake-category' } }] })).toThrow('资料格式');
+});
+
+test('单次归类超过六个岗位时先拒绝请求，不消耗生成额度', async ({ request }) => {
+  const response = await request.post('/api/jobs/classify', { data: { jobs: Array.from({ length: 7 }, (_, index) => ({ id: `too-many-${index}`, title: '设计师', content: '负责用户流程与交互原型设计，并进行测试验证。' })) } });
+  expect(response.status()).toBe(400); expect((await response.json()).error.code).toBe('INVALID_CLASSIFICATION_INPUT');
 });

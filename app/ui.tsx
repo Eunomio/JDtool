@@ -1,4 +1,12 @@
+'use client';
 import type { KeyboardEvent, ReactNode } from 'react';
+import { useState } from 'react';
+
+export function PlanButton({ onAdd }: { onAdd: () => void | Promise<void> }) {
+  const [state, setState] = useState<'idle' | 'saving' | 'added'>('idle');
+  const [error, setError] = useState('');
+  return <span className="plan-action"><button className={`plan-button ${state === 'added' ? 'is-added' : ''}`} disabled={state !== 'idle'} onClick={async () => { setState('saving'); setError(''); try { await onAdd(); setState('added'); } catch { setState('idle'); setError('未能加入，请重试。'); } }}><Icon name={state === 'added' ? 'check' : 'plus'} size={16} />{state === 'saving' ? '正在加入…' : state === 'added' ? '已加入计划' : '加入我的计划'}</button>{error && <small role="alert">{error}</small>}</span>;
+}
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const paths: Record<string, ReactNode> = {
@@ -15,6 +23,12 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
     link: <><path d="m10 13 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 2 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(1 1)" /></>,
     image: <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="8" r="1" /><path d="m3 17 5-5 4 4 4-6 5 7" /></>,
     clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l4 2" /></>,
+    layers: <><path d="m12 3 10 5-10 5L2 8l10-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" /></>,
+    sparkles: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3ZM20 2v4m-2-2h4" /></>,
+    merge: <><path d="M5 3v4c0 4 14 5 14 10v4M19 3v4c0 4-14 5-14 10v4m0-4-3 3m17-3 3 3" /></>,
+    target: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></>,
+    flag: <><path d="M5 22V3m0 1c5-5 9 5 15 0v11c-6 5-10-5-15 0" /></>,
+    chevron: <path d="m9 5 7 7-7 7" />,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.jobs}</svg>;
 }

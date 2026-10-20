@@ -5,6 +5,7 @@ import { database, type Job } from '../lib/database';
 import { prepareImage, type UploadImage } from '../lib/image-upload';
 import type { ParsedJob } from '../lib/job-parser';
 import { Icon } from './ui';
+import { roleCategories, roleInputVersion } from '../lib/role-taxonomy';
 
 type Mode = 'link' | 'images' | 'text';
 type Draft = ParsedJob & { sourceUrl: string; sourceType: Mode; parsedAt?: string };
@@ -12,7 +13,7 @@ function fromJob(job: Job): Draft {
   return { isJobPosting: true, rawText: job.content, title: job.title, company: job.company,
     location: job.location || '', direction: job.direction || '', hiringType: job.hiringType || '',
     responsibilities: job.responsibilities || [], requirements: job.requirements || [], warnings: job.warnings || [],
-    sourceUrl: job.sourceUrl || '', sourceType: job.sourceType || 'text', parsedAt: job.parsedAt };
+    sourceUrl: job.sourceUrl || '', sourceType: job.sourceType || 'text', parsedAt: job.parsedAt, classification: job.classification };
 }
 
 export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen }: {
@@ -81,6 +82,8 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
         parsedAt: draft.parsedAt, status: editing?.status || '关注中', nextAction: editing?.nextAction || '',
         createdAt: editing?.createdAt || now, updatedAt: now,
       };
+      job.classification = draft.classification?.inputVersion === roleInputVersion(job) ? draft.classification : undefined;
+      job.categoryOverride = (String(fields.get('categoryOverride') || '') || undefined) as Job['categoryOverride'];
       await database.jobs.put(job);
       setDraft(null); setImages([]); setUrl(''); setText(''); setDuplicate(null); setAllowDuplicate(false);
       await onSaved(job);
@@ -94,7 +97,10 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
     {error && <p role="alert" className="notice error">{error}</p>}
     {draft.warnings.length > 0 && <div className="notice">{draft.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
     <form onSubmit={save} className="review-layout"><div className="source-preview"><h3>原始资料</h3>{draft.sourceType === 'images' && images.map((image, index) => <img className="source-image" key={index} src={image.dataUrl} alt={`原始JD截图${index + 1}`} />)}<label>岗位原文<textarea name="rawText" rows={18} required defaultValue={draft.rawText} maxLength={60000} /></label></div>
-      <div className="review-fields"><label>岗位名称<input name="title" defaultValue={draft.title} maxLength={200} placeholder="未识别到，可补充或保存为草稿" /></label><label>公司名称<input name="company" defaultValue={draft.company} maxLength={200} /></label><div className="field-pair"><label>地点<input name="location" defaultValue={draft.location} maxLength={300} /></label><label>招聘类型<input name="hiringType" defaultValue={draft.hiringType} maxLength={200} /></label></div><label>岗位方向<input name="direction" defaultValue={draft.direction} maxLength={200} placeholder="可修改或自定义方向" /></label><label>岗位职责<textarea name="responsibilities" rows={5} defaultValue={draft.responsibilities.map((item) => item.text).join('\n')} /></label><label>任职要求<textarea name="requirements" rows={5} defaultValue={draft.requirements.map((item) => item.text).join('\n')} /></label><label>来源链接<input name="sourceUrl" type="url" defaultValue={draft.sourceUrl} /></label>
+      <div className="review-fields"><label>岗位名称<input name="title" defaultValue={draft.title} maxLength={200} placeholder="未识别到，可补充或保存为草稿" /></label><label>公司名称<input name="company" defaultValue={draft.company} maxLength={200} /></label><div className="field-pair"><label>地点<input name="location" defaultValue={draft.location} maxLength={300} /></label><label>招聘类型<input name="hiringType" defaultValue={draft.hiringType} maxLength={200} /></label></div>
+      <div className="classification-result"><span className="icon-tile"><Icon name="layers" /></span><div><span className="eyebrow">根据工作内容归类</span><h3>{draft.classification ? roleCategories.find(category => category.id === draft.classification?.categoryId)?.name : '保存后可继续分析职位类别'}</h3><p>{draft.classification?.reason || '公司命名各有不同，准备时可以把工作内容相近的岗位放在一起。'}</p>{draft.classification?.evidence.slice(0, 2).map(quote => <blockquote key={quote}>{quote}</blockquote>)}</div></div>
+      <label>调整职位大类<select name="categoryOverride" defaultValue={editing?.categoryOverride || ''}><option value="">使用JD分析结果</option>{roleCategories.map(category => <option key={category.id} value={category.id}>{category.family} · {category.name}</option>)}</select></label>
+      <label>岗位方向<input name="direction" defaultValue={draft.direction} maxLength={200} placeholder="保留JD中的细分方向，选填" /></label><label>岗位职责<textarea name="responsibilities" rows={5} defaultValue={draft.responsibilities.map((item) => item.text).join('\n')} /></label><label>任职要求<textarea name="requirements" rows={5} defaultValue={draft.requirements.map((item) => item.text).join('\n')} /></label><label>来源链接<input name="sourceUrl" type="url" defaultValue={draft.sourceUrl} /></label>
       <details><summary>查看逐条原文依据</summary>{[...draft.responsibilities, ...draft.requirements].map((item, index) => <blockquote key={index}><strong>{item.text}</strong><p>{item.sourceText}</p></blockquote>)}</details>
       <div className="sticky-actions"><button className="primary" disabled={busy || !ready} type="submit">{busy ? '保存中…' : '保存岗位'}</button></div></div>
     </form>

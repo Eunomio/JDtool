@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import type { RoleCategoryId, RoleClassification } from './role-taxonomy';
 
 export const statuses = ['关注中', '准备投递', '已投递', '笔试/测评', '面试中', '已获Offer', '已结束'] as const;
 export type JobStatus = typeof statuses[number];
@@ -12,6 +13,8 @@ export type Job = {
   images?: { name: string; dataUrl: string }[];
   location?: string;
   direction?: string;
+  classification?: RoleClassification;
+  categoryOverride?: RoleCategoryId;
   hiringType?: string;
   responsibilities?: { id: string; text: string; sourceText: string }[];
   requirements?: { id: string; text: string; sourceText: string }[];

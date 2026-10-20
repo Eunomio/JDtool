@@ -58,3 +58,21 @@ test('准备流程键盘切换、项目返回上下文与手机页面宽度', as
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('tab', { name: /准备项目/ }).press('End'); await expect(page.getByRole('tab', { name: /面试准备/ })).toBeFocused();
 });
+
+test('计划按钮显示成功反馈，重新生成后新建议可加入，完成事项更新实际进度', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/api/assist', route => { calls++; return route.fulfill({ json: { priorities: [{ ...advice, text: calls === 1 ? '梳理一次企业协作访谈' : '准备一个需求排序案例' }], strengths: [], gaps: [], companyResearch: [] } }); });
+  await seed(page); await page.getByRole('button', { name: job.title, exact: true }).click();
+  await page.getByRole('tab', { name: /面试准备/ }).click(); await page.getByRole('button', { name: '生成岗位准备卡' }).click();
+  const add = page.getByRole('button', { name: '加入我的计划', exact: true });
+  await expect(add).toHaveCSS('border-top-width', '1px'); await add.click();
+  await expect(page.getByRole('button', { name: '已加入计划', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '重新生成准备卡' }).click();
+  await expect(page.getByText('准备一个需求排序案例', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '加入我的计划', exact: true }).click();
+  await expect(page.getByRole('button', { name: '已加入计划', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '岗位清单', exact: true }).click();
+  await expect(page.getByRole('checkbox')).toHaveCount(2); await page.getByRole('checkbox').first().check();
+  await expect(page.locator('.plan-progress progress')).toHaveAttribute('value', '1');
+  await expect(page.getByText('又完成一项准备，下一步更有把握。', { exact: true })).toBeVisible();
+});
