@@ -85,7 +85,7 @@ test('分析期间修改JD或删除岗位时跳过旧结果，保留最新投递
     try { await new Promise<void>(resolve => { const tx = db.transaction('jobs', 'readwrite'); const table = tx.objectStore('jobs'); table.delete('ux-b'); const request = table.get('research-c'); request.onsuccess = () => table.put({ ...request.result, content: '新的岗位正文：负责后端接口开发与数据库事务设计。' }); const status = table.get('ux-a'); status.onsuccess = () => table.put({ ...status.result, status: '已投递' }); tx.oncomplete = () => resolve(); }); } finally { db.close(); }
   });
   release();
-  await expect(page.locator('main').getByRole('alert')).toContainText('部分岗位还未完成归类');
+  await expect(page.getByRole('status', { name: '岗位类型识别', exact: true })).toContainText('部分岗位还未完成归类');
   const records = await saved(page); expect(records).toHaveLength(2);
   expect(records.find(job => job.id === 'ux-a')).toMatchObject({ status: '已投递', classification: { categoryId: 'experience_design' } });
   expect(records.find(job => job.id === 'research-c')).toMatchObject({ content: '新的岗位正文：负责后端接口开发与数据库事务设计。' });
@@ -98,7 +98,7 @@ test('自动归类失败后可直接重试并保存，无需应用建议', async
   await page.route('**/api/jobs/classify', async route => {
     calls++; await route.fulfill(calls === 1 ? { status: 503, json: { error: {} } } : { json: result(route.request().postDataJSON()) });
   });
-  await seed(page); await expect(page.locator('main').getByRole('alert')).toContainText('部分岗位还未完成归类');
+  await seed(page); await expect(page.getByRole('status', { name: '岗位类型识别', exact: true })).toContainText('部分岗位还未完成归类');
   expect(calls).toBe(1); await page.getByRole('button', { name: '重试自动识别' }).click();
   await expect.poll(async () => (await saved(page)).filter(job => job.classification).length).toBe(3);
   expect((await saved(page)).every(job => job.classification)).toBe(true); expect(calls).toBe(2);
