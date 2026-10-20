@@ -150,7 +150,7 @@ blockquote strong { font-weight: 550; }
 .back-button { margin: 0 0 16px; padding-left: 0; }
 
 /* The workspace uses the same controls and spacing across research, preparation and practice. */
-:root { --bg: #f5f6f3; --ink: #233b35; --muted: #72807a; --line: #e3e8e2; --blue: #226b54; --soft: #edf4ed; }
+:root { --bg: #f5f6f3; --ink: #233b35; --muted: #65726c; --line: #e3e8e2; --blue: #226b54; --soft: #edf4ed; }
 body { font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
 button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 button { transition: background .16s, border-color .16s, box-shadow .16s; }
@@ -428,5 +428,11 @@ blockquote { border-left-color: #acc3a0; background: #f6f9f1; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 @media (min-width: 801px) { .hero-content p, .requirement-list p, .skill-list p { font-size: 13px; } .hero-kicker, .hero-journey small, .eyebrow, .nav-caption, .company, .job-footer, .job-footer button, .job .next-action { font-size: 11px; } .job-priorities, .job .next-action input, .job > .muted, .filter-bar select, .status-strip button, .list-tools > button { font-size: 12px; } .workspace-stats span, .source-domain { font-size: 11px; } .workspace-stats > div { gap: 11px; } }
+.nav-caption, .today-label, .sidebar-note, .company, .job .next-action, .job-priorities, .group-heading, .workspace-stats span, .list-tools > button, .source-domain, .research-summary small, .research-progress small, .practice-flow > span, .scenario-label, .colleague-message strong, .colleague-message small, .my-action span, .task-title > span { color: #65765c; }
+.sidebar nav button { color: #62735e; }
+.workspace-tabs button, .view-toggle button { color: #62735b; }
+.status-strip button strong, .workspace-stats small { color: #5e6e55; }
+.tag, .count, .job-heading select { color: #506b42; }
+@media (max-width: 800px) { .sidebar nav button { font-size: 10px; } .status-strip button { font-size: 11px; } .company, .job .next-action, .job-footer, .job-footer button { font-size: 11px; } }
 @media (max-width: 1100px) { .builder-columns { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 800px) { .review-layout, .field-pair, .preparation-grid, .project-grid, .selection-grid { grid-template-columns: minmax(0, 1fr); } .section-heading { flex-wrap: wrap; } .comparison-column { min-width: 260px; } .task-row { flex-wrap: wrap; } .image-grid { grid-template-columns: minmax(0, 1fr); } .image-item img { height: 200px; } }
