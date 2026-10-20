@@ -2,9 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './ui';
 
-type Destination = 'home' | 'jobs' | 'detail' | 'projects' | 'categories' | 'compare' | 'interview' | 'scenario';
+type Destination = 'home' | 'jobs' | 'detail' | 'projects' | 'compare' | 'interview' | 'scenario';
 const primary = [{ id: 'home', label: '首页', icon: 'home' }, { id: 'jobs', label: '岗位清单', icon: 'jobs' }, { id: 'detail', label: '岗位详情', icon: 'detail' }, { id: 'projects', label: '我的项目', icon: 'projects' }] as const;
-const secondary = [{ id: 'categories', label: '岗位归类', description: '整理相似岗位与分类', icon: 'layers' }, { id: 'compare', label: '岗位比较', description: '找到共同要求和差异', icon: 'compare' }, { id: 'interview', label: '模拟面试', description: '练习回答与追问', icon: 'interview' }, { id: 'scenario', label: '岗位体验', description: '处理真实风格的工作任务', icon: 'scenario' }] as const;
+const secondary = [{ id: 'compare', label: '岗位比较', description: '找到共同要求和差异', icon: 'compare' }, { id: 'interview', label: '模拟面试', description: '练习回答与追问', icon: 'interview' }, { id: 'scenario', label: '岗位体验', description: '处理真实风格的工作任务', icon: 'scenario' }] as const;
 export default function MobileNavigation({ page, onNavigate }: { page: string; onNavigate: (page: Destination) => void }) {
   const [more, setMore] = useState(false); const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {

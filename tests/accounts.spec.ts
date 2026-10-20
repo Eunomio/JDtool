@@ -68,7 +68,7 @@ test('手机、平板与桌面没有整页横向溢出，导航与表单始终�
   await signIn(page, username()); await addJob(page, '长岗位名称与跨团队需求分析产品经理ProductManager');
   for (const width of [320, 390, 600, 767, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const destination of ['首页', '岗位清单', '岗位详情', '我的项目', '岗位归类']) {
+    for (const destination of ['首页', '岗位清单', '岗位详情', '我的项目', '岗位比较']) {
       await nav(page, destination); await expect(page.locator('main.app-main')).toBeVisible();
       const dimensions = await page.evaluate(() => ({ visible: innerWidth, full: document.documentElement.scrollWidth })); expect(dimensions.full, `${width}px / ${destination}`).toBeLessThanOrEqual(dimensions.visible);
     }

@@ -19,7 +19,7 @@ async function seed(page: Page, classified = false) {
   await page.getByText('资料备份', { exact: true }).click(); page.once('dialog', dialog => dialog.accept());
   await page.getByLabel('选择备份文件').setInputFiles({ name: 'categories.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'jdtool-backup', version: 2, jobs: jobs.map((job, index) => ({ ...job, ...(classified ? { classification: classification(job, index) } : {}) })) })) });
   await expect(page.getByText('备份已恢复。', { exact: true })).toBeVisible(); await page.getByText('资料备份', { exact: true }).click();
-  await navigate(page, '岗位归类');
+  await navigate(page, '岗位清单');
 }
 async function saved(page: Page) {
   return page.evaluate(async () => {
@@ -37,10 +37,10 @@ test('旧岗位自动按JD直接归类，无需确认，刷新不重复分析且
     await route.fulfill({ json: result(input) });
   });
   await seed(page);
-  await expect(page.getByText('已自动归类3个岗位，可直接筛选和比较。')).toBeVisible();
+  await expect.poll(async () => (await saved(page)).filter(job => job.classification).length).toBe(3);
   expect((await saved(page)).every(job => job.classification && job.hiringType === '校招')).toBe(true);
   await expect(page.getByRole('button', { name: /应用建议|确认分类/ })).toHaveCount(0);
-  await page.locator('.classification-card').filter({ has: page.getByLabel('选择归类 甲公司 交互设计师') }).getByText('查看JD原句依据', { exact: true }).click(); await expect(page.getByText('负责用户任务流程与交互原型设计', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '交互设计师', exact: true }).click(); await page.getByText('查看分类的JD依据', { exact: true }).click(); await expect(page.getByText('负责用户任务流程与交互原型设计', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '岗位清单', exact: true }).click(); await page.reload();
   await page.getByLabel('按职位大类筛选').selectOption('experience_design');
   await expect(page.getByRole('button', { name: '交互设计师', exact: true })).toBeVisible();
@@ -51,19 +51,25 @@ test('旧岗位自动按JD直接归类，无需确认，刷新不重复分析且
   expect(await page.locator('.primary').first().evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(36, 82, 232)');
 });
 
-test('手动合并直接保存，保留原始JD与投递状态，并可撤销和导出归类依据', async ({ page }) => {
+test('详情内修改单个岗位类型，可导出手动设置并恢复自动识别，保留JD与投递状态', async ({ page }) => {
   await seed(page, true);
-  await page.getByLabel('选择归类 甲公司 交互设计师').check(); await page.getByLabel('选择归类 丙公司 用户研究工程师').check();
-  await page.getByLabel('合并到', { exact: true }).selectOption('experience_design');
-  await page.getByRole('button', { name: '合并所选岗位（2）' }).click(); await expect(page.getByText('已将2个岗位归入“用户体验设计”。')).toBeVisible();
-  const merged = await saved(page); expect(merged.find(job => job.id === 'research-c')?.categoryOverride).toBe('experience_design');
-  for (const original of jobs) expect(merged.find(job => job.id === original.id)).toMatchObject({ title: original.title, content: original.content, status: '面试中' });
-  await page.getByRole('button', { name: '撤销本次调整' }).click(); await expect(page.getByText('已撤销本次分类调整。')).toBeVisible();
-  expect((await saved(page)).find(job => job.id === 'research-c')?.categoryOverride).toBeUndefined();
+  await page.getByRole('button', { name: '用户研究工程师', exact: true }).click(); await page.getByRole('button', { name: '修改岗位类型', exact: true }).click();
+  await page.getByLabel('岗位类型', { exact: true }).selectOption('experience_design'); await page.getByRole('button', { name: '保存岗位类型', exact: true }).click(); await expect(page.getByText('岗位类型已更新。', { exact: true })).toBeVisible();
+  await expect(page.locator('.job-category h2')).toHaveText('用户体验设计');
+  const changed = await saved(page); expect(changed.find(job => job.id === 'research-c')?.categoryOverride).toBe('experience_design'); expect(changed.filter(job => job.id !== 'research-c').every(job => !job.categoryOverride)).toBe(true);
+  for (const original of jobs) expect(changed.find(job => job.id === original.id)).toMatchObject({ title: original.title, content: original.content, status: '面试中', updatedAt: now });
+  await navigate(page, '岗位清单'); await page.getByLabel('按职位大类筛选').selectOption('experience_design'); await expect(page.getByRole('button', { name: '用户研究工程师', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '用户研究工程师', exact: true }).click();
   await page.getByText('资料备份', { exact: true }).click(); const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: '导出备份' }).click();
   const { readFile } = await import('node:fs/promises'); const downloaded = JSON.parse(await readFile((await (await downloading).path())!, 'utf8'));
+  expect(downloaded.jobs.find((job: { id: string }) => job.id === 'research-c').categoryOverride).toBe('experience_design');
   expect(downloaded.jobs.find((job: { id: string }) => job.id === 'research-c').classification).toMatchObject({ categoryId: 'user_research', evidence: ['负责用户访谈与实验设计'] });
   expect(downloaded.jobs.every((job: { hiringType: string }) => job.hiringType === '校招')).toBe(true);
+  await page.getByText('资料备份', { exact: true }).click(); await page.getByRole('button', { name: '修改岗位类型', exact: true }).click(); await page.getByLabel('岗位类型', { exact: true }).selectOption(''); await page.getByRole('button', { name: '保存岗位类型', exact: true }).click();
+  await expect(page.getByText('已恢复自动识别。', { exact: true })).toBeVisible(); await expect(page.locator('.job-category h2')).toHaveText('用户研究与人因'); expect((await saved(page)).find(job => job.id === 'research-c')?.categoryOverride).toBeUndefined();
+  await page.reload(); await expect(page.locator('.job-category h2')).toHaveText('用户研究与人因');
+  await page.getByRole('button', { name: '修改岗位类型', exact: true }).click(); await page.getByLabel('岗位类型', { exact: true }).selectOption('product_management'); await page.getByRole('button', { name: '取消', exact: true }).click(); expect((await saved(page)).find(job => job.id === 'research-c')?.categoryOverride).toBeUndefined();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('分析期间修改JD或删除岗位时跳过旧结果，保留最新投递状态且失败不循环请求', async ({ page }) => {
@@ -84,7 +90,7 @@ test('分析期间修改JD或删除岗位时跳过旧结果，保留最新投递
   expect(records.find(job => job.id === 'ux-a')).toMatchObject({ status: '已投递', classification: { categoryId: 'experience_design' } });
   expect(records.find(job => job.id === 'research-c')).toMatchObject({ content: '新的岗位正文：负责后端接口开发与数据库事务设计。' });
   expect(records.find(job => job.id === 'research-c')?.classification).toBeUndefined();
-  await page.getByRole('button', { name: '选择全部', exact: true }).click(); expect(calls).toBe(2);
+  await expect.poll(() => calls).toBe(2); await page.getByLabel('搜索岗位或公司').fill('交互'); await expect(page.getByRole('button', { name: '交互设计师', exact: true })).toBeVisible(); expect(calls).toBe(2);
 });
 
 test('自动归类失败后可直接重试并保存，无需应用建议', async ({ page }) => {
@@ -93,8 +99,8 @@ test('自动归类失败后可直接重试并保存，无需应用建议', async
     calls++; await route.fulfill(calls === 1 ? { status: 503, json: { error: {} } } : { json: result(route.request().postDataJSON()) });
   });
   await seed(page); await expect(page.locator('main').getByRole('alert')).toContainText('部分岗位还未完成归类');
-  expect(calls).toBe(1); await page.getByRole('button', { name: '重新分析全部JD' }).click();
-  await expect(page.getByText('已自动归类3个岗位，可直接筛选和比较。')).toBeVisible();
+  expect(calls).toBe(1); await page.getByRole('button', { name: '重试自动识别' }).click();
+  await expect.poll(async () => (await saved(page)).filter(job => job.classification).length).toBe(3);
   expect((await saved(page)).every(job => job.classification)).toBe(true); expect(calls).toBe(2);
 });
 
@@ -119,8 +125,28 @@ test('两个标签页同时自动归类时共用已保存的结果', async ({ pa
   await seed(page); await expect.poll(() => calls).toBe(1);
   const other = await context.newPage(); await other.goto('/');
   await expect(other.getByText('正在自动整理岗位类别', { exact: false })).toBeVisible();
-  release(); await expect(page.getByText('已自动归类3个岗位，可直接筛选和比较。')).toBeVisible();
+  release(); await expect.poll(async () => (await saved(page)).filter(job => job.classification).length).toBe(3);
   await expect(other.getByText('正在自动整理岗位类别', { exact: false })).toHaveCount(0);
   await other.getByLabel('按职位大类筛选').selectOption('experience_design'); await expect(other.getByRole('button', { name: '体验设计师', exact: true })).toBeVisible();
   expect(calls).toBe(1); await other.close();
+});
+
+test('归类页面和批量入口已移除，旧链接返回清单，手机更多保留其他功能', async ({ page }) => {
+  await seed(page, true); await page.goto('/#categories'); await expect(page.getByRole('heading', { name: '岗位清单', exact: true })).toBeVisible(); await expect(page).toHaveURL(/#jobs$/);
+  await expect(page.getByRole('button', { name: '岗位归类', exact: true, includeHidden: true })).toHaveCount(0); await expect(page.getByRole('button', { name: '智能归类与合并', exact: true, includeHidden: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 }); await page.getByRole('button', { name: '更多功能', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '更多功能' }).getByRole('button', { name: '岗位归类', exact: true })).toHaveCount(0);
+  for (const name of ['岗位比较', '模拟面试', '岗位体验']) await expect(page.getByRole('dialog', { name: '更多功能' }).getByRole('button', { name, exact: true })).toBeVisible();
+});
+
+test('自动分析返回时保留详情里刚保存的手动类型，恢复自动识别会重新判断未完成的JD', async ({ page }) => {
+  let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }); let calls = 0;
+  await page.route('**/api/jobs/classify', async route => { calls++; const input = route.request().postDataJSON(); if (calls === 1) await wait; await route.fulfill({ json: result(input) }); });
+  await seed(page); await expect.poll(() => calls).toBe(1); await page.getByRole('button', { name: '交互设计师', exact: true }).click(); await page.getByRole('button', { name: '修改岗位类型', exact: true }).click();
+  await page.getByLabel('岗位类型', { exact: true }).selectOption('product_management'); await page.getByRole('button', { name: '保存岗位类型', exact: true }).click(); await expect(page.locator('.job-category h2')).toHaveText('产品经理');
+  release(); await expect.poll(async () => (await saved(page)).filter(job => job.classification).length).toBe(2); expect((await saved(page)).find(job => job.id === 'ux-a')?.categoryOverride).toBe('product_management');
+  await expect(page.getByText('正在自动整理岗位类别', { exact: false })).toHaveCount(0);
+  await page.getByRole('button', { name: '修改岗位类型', exact: true }).click(); await page.getByLabel('岗位类型', { exact: true }).selectOption(''); await page.getByRole('button', { name: '保存岗位类型', exact: true }).click();
+  await expect(page.locator('.job-category h2')).toHaveText('用户体验设计'); expect((await saved(page)).find(job => job.id === 'ux-a')?.categoryOverride).toBeUndefined(); expect(calls).toBe(2);
+  for (const width of [320, 768, 1440]) { await page.setViewportSize({ width, height: 900 }); await page.getByRole('button', { name: '修改岗位类型', exact: true }).click(); await expect(page.getByLabel('岗位类型', { exact: true })).toBeVisible(); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); await page.getByRole('button', { name: '取消', exact: true }).click(); }
 });
