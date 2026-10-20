@@ -10,3 +10,4 @@
 !lib/**
 !scripts/
 !scripts/prepare-standalone.mjs
+!scripts/prepare-assets.mjs

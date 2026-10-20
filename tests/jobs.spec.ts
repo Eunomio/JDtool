@@ -2,13 +2,17 @@ import { expect, test } from '@playwright/test';
 
 test('保存、刷新、修改状态、编辑与删除撤销', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: '新增JD', exact: true }).click();
+  await page.getByRole('tab', { name: '粘贴正文' }).click();
+  await page.getByLabel('岗位正文').fill('分析用户需求，协同技术与运营推进产品改进。');
+  await page.getByRole('button', { name: '手动整理为草稿' }).click();
   await page.getByLabel('岗位名称').fill('产品经理');
   await page.getByLabel('公司名称').fill('测试公司');
-  await page.getByLabel('岗位正文').fill('分析用户需求，协同技术与运营推进产品改进。');
   await page.getByRole('button', { name: '保存岗位' }).click();
   await expect(page.getByRole('heading', { name: '产品经理', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '返回岗位清单', exact: true }).click();
   await page.reload();
-  await expect(page.getByRole('heading', { name: '产品经理', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '产品经理', exact: true })).toBeVisible();
   await page.getByLabel('产品经理投递状态').selectOption('面试中');
   const nextAction = page.getByLabel('下一步行动');
   await nextAction.fill('准备需求分析项目');
@@ -36,9 +40,10 @@ test('保存、刷新、修改状态、编辑与删除撤销', async ({ page }) 
   await page.getByLabel('岗位名称').fill('AI产品经理');
   await page.getByRole('button', { name: '保存岗位' }).click();
   await expect(page.getByRole('heading', { name: 'AI产品经理', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '返回岗位清单', exact: true }).click();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '删除', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI产品经理', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'AI产品经理', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'AI产品经理', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'AI产品经理', exact: true })).toBeVisible();
 });

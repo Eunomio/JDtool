@@ -1,0 +1,59 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { database, type Job, type PracticeFeedback, type Source } from '../lib/database';
+import { api, copyText, inputVersion } from '../lib/client';
+import { exerciseFor, type Exercise } from '../lib/exercises';
+
+type State = { exercise?: Exercise; answer: string; followup: string; supplement: string; feedback: PracticeFeedback | null; node: number; moves: { node: number; action: string; dialogue: string; consequence: string }[]; choice: string; question: string; response: { dialogue: string; consequence: string } | null };
+const initial: State = { answer: '', followup: '', supplement: '', feedback: null, node: 0, moves: [], choice: '', question: '', response: null };
+
+export default function Practice({ job, mode, sources, addTask, refresh }: { job: Job; mode: 'interview' | 'scenario'; sources: Source[]; addTask: (text: string, jobIds: string[]) => void; refresh: () => Promise<void> }) {
+  const [state, setState] = useState<State>(initial);
+  const [loaded, setLoaded] = useState(false);
+  const [savedVersion, setSavedVersion] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const exercise = state.exercise || exerciseFor(job);
+  const jobSources = sources.filter((source) => source.jobId === job.id);
+  const version = inputVersion(job, [], jobSources);
+  const sessionId = `${mode}-${job.id}`;
+  useEffect(() => { let cancelled = false; database.practice.get(sessionId).then(async (session) => {
+    if (cancelled) return;
+    if (session) { setState(session.data as unknown as State); setSavedVersion(session.inputVersion); }
+    else if (!job.sample) {
+      setBusy(true);
+      try { const exercise = await api<Exercise>('/api/assist', { action: 'exercise', job, sources: jobSources }); if (!cancelled) await persist({ ...structuredClone(initial), exercise }); }
+      catch (error) { if (!cancelled) setError(error instanceof Error ? error.message : '题目尚未生成，可稍后按当前JD重试。'); }
+      finally { if (!cancelled) setBusy(false); }
+    }
+    if (!cancelled) setLoaded(true);
+  }); return () => { cancelled = true; }; }, [sessionId]);
+  async function persist(next: State) { setState(next); await database.practice.put({ id: sessionId, jobId: job.id, type: mode, inputVersion: version, data: next as unknown as Record<string, unknown>, updatedAt: new Date().toISOString() }); setSavedVersion(version); }
+  async function run(task: () => Promise<void>) { setBusy(true); setError(''); setMessage(''); try { await task(); } catch (error) { setError(error instanceof Error ? error.message : '本次未完成，回答已保留，请重试。'); } finally { setBusy(false); } }
+  async function customize() { await run(async () => { const exercise = await api<Exercise>('/api/assist', { action: 'exercise', job, sources: jobSources }); await persist({ ...structuredClone(initial), exercise }); }); }
+  const current = exercise.nodes[state.node];
+  async function interview(stage: 'followup' | 'review') { await run(async () => { const result = await api<{ followup: string; feedback: PracticeFeedback | null }>('/api/assist', { action: 'interview', job, sources: jobSources, stage, context: JSON.stringify(exercise), answer: state.answer, supplement: state.supplement }); await persist({ ...state, followup: stage === 'followup' ? result.followup : state.followup, feedback: result.feedback }); }); }
+  async function scenario(stage: 'dialogue' | 'decision' | 'review') {
+    await run(async () => {
+      const result = await api<{ dialogue: string; consequence: string; feedback: PracticeFeedback | null }>('/api/assist', { action: 'scenario', job, sources: jobSources, stage, context: JSON.stringify({ exercise, currentNode: state.node, history: state.moves }), answer: stage === 'dialogue' ? state.question : state.choice });
+      if (stage === 'review') await persist({ ...state, feedback: result.feedback });
+      else if (stage === 'dialogue') { await persist({ ...state, question: '', response: { dialogue: result.dialogue, consequence: '' }, moves: [...state.moves, { node: state.node, action: `向同事提问：${state.question}`, dialogue: result.dialogue, consequence: '' }] }); }
+      else await persist({ ...state, response: result, moves: [...state.moves, { node: state.node, action: state.choice, dialogue: result.dialogue, consequence: result.consequence }] });
+    });
+  }
+  return <section className="panel practice"><p className="eyebrow">{job.company} · {job.title}</p><div className="section-heading"><h1>{mode === 'interview' ? '模拟面试' : '体验岗位一天'}</h1><button className="text-button" disabled={busy || !loaded} onClick={() => { if (window.confirm('重新开始这次练习？当前回答和复盘将被替换。')) void persist(structuredClone(initial)); }}>重新开始</button></div>
+    {savedVersion && savedVersion !== version && <div className="notice">岗位或公司资料已更新，这份记录来自更新前的练习，可重新开始。</div>}
+    <p className="scenario-label">工作情境中的事件、人物和数据均为模拟材料</p><button className="secondary" disabled={busy || !loaded} onClick={() => { if ((!state.answer && !state.moves.length) || window.confirm('按当前JD重新生成题目与任务，会替换本次练习，继续吗？')) void customize(); }}>{busy ? '正在准备…' : '按当前JD调整题目与任务'}</button><p className="scenario-background">{exercise.background}</p><div className="tag-row">{exercise.dimensions.map((dimension) => <span className="tag" key={dimension}>{dimension}</span>)}</div>
+    <details><summary>岗位依据与公司资料</summary>{[...(job.requirements || []), ...(job.responsibilities || [])].map((item) => <blockquote key={item.id}>{item.sourceText || item.text}</blockquote>)}{jobSources.map((source) => <p key={source.id}>{source.label}：{source.text}</p>)}</details>
+    {error && <div className="notice error" role="alert">{error}</div>}{message && <div className="notice" role="status">{message}</div>}
+    {!state.feedback && mode === 'interview' && <div className="page-stack"><div className="question-card"><h2>本轮题目</h2><p>{exercise.question}</p></div><label>我的回答<textarea rows={9} maxLength={20000} value={state.answer} disabled={!!state.followup || busy} onChange={(event) => setState({ ...state, answer: event.target.value })} onBlur={() => persist(state)} /></label>{!state.followup ? <button className="primary" disabled={busy || !loaded || !state.answer.trim()} onClick={() => interview('followup')}>{busy ? '正在阅读回答…' : '提交回答，获得追问'}</button> : <><div className="dialogue"><strong>面试官追问</strong><p>{state.followup}</p></div><label>补充回答<textarea rows={7} maxLength={20000} value={state.supplement} onChange={(event) => setState({ ...state, supplement: event.target.value })} onBlur={() => persist(state)} /></label><button className="primary" disabled={busy || !state.supplement.trim()} onClick={() => interview('review')}>{busy ? '正在整理复盘…' : '提交补充，查看复盘'}</button></>}</div>}
+    {!state.feedback && mode === 'scenario' && current && <div className="page-stack"><p className="progress-message">第{state.node + 1}/2个决策</p><progress value={state.node + (state.response?.consequence ? 1 : 0)} max={2} /><h2>{current.title}</h2><p>{current.situation}</p><p className="notice">{current.change}</p>
+      {state.moves.filter((move) => move.node === state.node).map((move, index) => <div className="dialogue" key={index}><p><strong>我：</strong>{move.action}</p><p><strong>{current.colleague}：</strong>{move.dialogue}</p>{move.consequence && <p><strong>工作后果：</strong>{move.consequence}</p>}</div>)}
+      {!state.response?.consequence && <><label>向{current.colleague}提问<input value={state.question} maxLength={2000} onChange={(event) => setState({ ...state, question: event.target.value })} /><button className="text-button" disabled={busy || !state.question.trim()} onClick={() => scenario('dialogue')}>发送问题</button></label><fieldset><legend>你准备怎么推进？</legend>{current.choices.map((choice) => <label key={choice} className="selection-card"><input type="radio" name="choice" checked={state.choice === choice} onChange={() => setState({ ...state, choice })} />{choice}</label>)}</fieldset><label>也可写下自己的做法<textarea rows={3} value={current.choices.includes(state.choice) ? '' : state.choice} onChange={(event) => setState({ ...state, choice: event.target.value })} /></label><button className="primary" disabled={busy || !state.choice.trim()} onClick={() => scenario('decision')}>{busy ? '同事正在回应…' : '提交行动'}</button></>}
+      {state.response?.consequence && <button className="primary" disabled={busy} onClick={() => state.node === 0 ? persist({ ...state, node: 1, choice: '', question: '', response: null }) : scenario('review')}>{busy ? '正在整理复盘…' : state.node === 0 ? '继续下一项任务' : '查看下班复盘'}</button>}
+    </div>}
+    {state.feedback && <div className="page-stack"><h2>本次复盘</h2><section><h3>做得好的点</h3><ul>{state.feedback.strengths.map((text, index) => <li key={index}>{text}</li>)}</ul></section><div className="preparation-grid">{state.feedback.dimensions.map((dimension, index) => <div className="advice-item" key={index}><h3>{dimension.name}</h3><p>{dimension.feedback}</p><details><summary>对应JD要求</summary>{[...(job.requirements || []), ...(job.responsibilities || []), { id: `${job.id}-original`, text: job.content, sourceText: job.content }].filter((item) => dimension.requirementIds.includes(item.id)).map((item) => <blockquote key={item.id}>{item.sourceText || item.text}</blockquote>)}</details></div>)}</div><section><h3>值得补充的点</h3><ul>{state.feedback.improvements.map((text, index) => <li key={index}>{text}</li>)}</ul></section><section><h3>{mode === 'interview' ? '完善回答的提纲' : '下一次任务可尝试的做法'}</h3><ol>{state.feedback.outline.map((text, index) => <li key={index}>{text}</li>)}</ol><button className="secondary" onClick={() => run(async () => { await copyText(state.feedback!.outline.join('\n')); setMessage('已复制提纲。'); })}>复制提纲</button></section><section><h3>建议练习</h3>{state.feedback.nextActions.map((text, index) => <p key={index}>{text}<button className="text-button" onClick={() => addTask(text, [job.id])}>加入我的计划</button><button className="text-button" onClick={() => run(async () => { await database.jobs.update(job.id, { nextAction: text, updatedAt: new Date().toISOString() }); await refresh(); setMessage('已设为这个岗位的下一步行动。'); })}>设为下一步行动</button></p>)}</section></div>}
+    <p className="privacy-note">提交的回答或行动会用于本次追问与复盘，并保存在当前浏览器。</p>
+  </section>;
+}

@@ -1,29 +1,37 @@
 {
   "name": "jdtool",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "engines": {
     "node": "24.x"
   },
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 7860",
-    "build": "next build && node scripts/prepare-standalone.mjs",
+    "dev": "node scripts/prepare-assets.mjs && next dev --hostname 0.0.0.0 --port 7860",
+    "build": "node scripts/prepare-assets.mjs && next build && node scripts/prepare-standalone.mjs",
     "start": "node scripts/start.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "modelscope:probe": "node scripts/modelscope.mjs probe"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "dexie": "4.4.6",
+    "ipaddr.js": "^2.5.0",
+    "mammoth": "^1.13.0",
     "next": "16.4.2",
+    "pdfjs-dist": "^6.4.299",
+    "playwright": "^1.64.1",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "undici": "^8.12.3",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "jszip": "^3.10.2",
     "typescript": "^5.9.0"
   }
 }
