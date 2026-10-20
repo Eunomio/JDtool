@@ -1,10 +1,12 @@
 import type { Job, Project } from './database';
+import { accountRequestHeaders } from './database';
 
 export async function api<T>(path: string, input: unknown): Promise<T> {
   let response: Response;
-  try { response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(180_000) }); }
+  try { response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...accountRequestHeaders() }, body: JSON.stringify(input), signal: AbortSignal.timeout(180_000) }); }
   catch { throw new Error('连接等待较久，输入资料已保留，请稍后重试。'); }
   const result = await response.json().catch(() => { throw new Error('暂时无法完成，输入资料已保留，请稍后重试。'); });
+  if (response.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event('jdtool-account-changed'));
   if (!response.ok) throw new Error(result.error?.message || '暂时无法完成，请重试。');
   return result as T;
 }

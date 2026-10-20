@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { database, type Job } from './database';
+import { database, accountRequestHeaders, type Job } from './database';
 import { storedClassificationSchema } from './classification-schema';
 import { roleInputVersion } from './role-taxonomy';
 import { normalizeHiringType } from './job-normalization';
@@ -21,7 +21,7 @@ export async function classifyAndSaveJobs(snapshots: Job[], signal: AbortSignal,
   const batch = latest.filter((job): job is Job => !!job && snapshots.some(snapshot => snapshot.id === job.id && roleInputVersion(snapshot) === roleInputVersion(job) && classificationState(snapshot) === classificationState(job)) && (force || needsRoleClassification(job)));
   if (!batch.length) return { saved: 0, missing: 0 };
   const response = await fetch('/api/jobs/classify', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...accountRequestHeaders() },
     signal: AbortSignal.any([signal, AbortSignal.timeout(150000)]),
     body: JSON.stringify({ jobs: batch.map(job => ({ id: job.id, title: job.title, content: job.content, responsibilities: job.responsibilities, requirements: job.requirements })) }),
   });

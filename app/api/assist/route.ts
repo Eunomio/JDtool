@@ -1,3 +1,4 @@
+import { requireUser } from '../../../lib/account-server';
 import { assist, assistInput } from '../../../lib/assistant';
 import { AppError, errorResponse, readJson } from '../../../lib/errors';
 import { limitRequest } from '../../../lib/usage';
@@ -7,6 +8,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 150;
 export async function POST(request: Request) {
   try {
+    await requireUser(request);
     limitRequest(request);
     return await withModelRequest(request, async () => {
       const input = assistInput.safeParse(await readJson(request, 1_200_000));

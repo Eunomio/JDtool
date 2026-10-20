@@ -1,3 +1,4 @@
+import { requireUser } from '../../../../lib/account-server';
 import { z } from 'zod';
 import { AppError, errorResponse, readJson } from '../../../../lib/errors';
 import { checkImage } from '../../../../lib/job-parser';
@@ -8,6 +9,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 150;
 export async function POST(request: Request) {
   try {
+    await requireUser(request);
     limitRequest(request);
     return await withModelRequest(request, async () => {
       const input = z.object({ images: z.array(z.object({ name: z.string().max(300), dataUrl: z.string().max(3_400_000) })).min(1).max(3) }).safeParse(await readJson(request));

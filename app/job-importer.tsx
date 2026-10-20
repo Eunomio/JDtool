@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import { database, type Job } from '../lib/database';
+import { database, accountRequestHeaders, type Job } from '../lib/database';
 import { prepareImage, type UploadImage } from '../lib/image-upload';
 import type { ParsedJob } from '../lib/job-parser';
 import { normalizeHiringType } from '../lib/job-normalization';
@@ -51,7 +51,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
     setStage(mode === 'link' ? '正在读取招聘网页并提取岗位内容…' : mode === 'images' ? '正在识别截图文字并提取岗位内容…' : '正在提取岗位职责和要求…');
     try {
       const response = await fetch('/api/jobs/parse', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...accountRequestHeaders() },
         body: JSON.stringify({ type: mode, url: url.trim(), text, images: mode === 'images' ? images : undefined }),
         signal: AbortSignal.timeout(180_000),
       });

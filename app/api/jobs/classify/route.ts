@@ -1,3 +1,4 @@
+import { requireUser } from '../../../../lib/account-server';
 import { AppError, errorResponse, readJson } from '../../../../lib/errors';
 import { classifyInputSchema, classifyJobs } from '../../../../lib/role-classification';
 import { withModelRequest } from '../../../../lib/model';
@@ -7,6 +8,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 150;
 export async function POST(request: Request) {
   try {
+    await requireUser(request);
     limitRequest(request);
     return await withModelRequest(request, async () => {
       const input = classifyInputSchema.safeParse(await readJson(request, 650000));

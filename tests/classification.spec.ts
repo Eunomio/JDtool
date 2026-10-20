@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, test, type Page, navigate } from './fixtures';
 import { roleInputVersion, type RoleClassification } from '../lib/role-taxonomy';
 
 const now = new Date().toISOString();
@@ -19,11 +19,11 @@ async function seed(page: Page, classified = false) {
   await page.getByText('资料备份', { exact: true }).click(); page.once('dialog', dialog => dialog.accept());
   await page.getByLabel('选择备份文件').setInputFiles({ name: 'categories.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'jdtool-backup', version: 2, jobs: jobs.map((job, index) => ({ ...job, ...(classified ? { classification: classification(job, index) } : {}) })) })) });
   await expect(page.getByText('备份已恢复。', { exact: true })).toBeVisible(); await page.getByText('资料备份', { exact: true }).click();
-  await page.getByRole('button', { name: '岗位归类', exact: true }).click();
+  await navigate(page, '岗位归类');
 }
 async function saved(page: Page) {
   return page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => { const opening = indexedDB.open('jdtool'); opening.onsuccess = () => resolve(opening.result); opening.onerror = () => reject(opening.error); });
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { const opening = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`); opening.onsuccess = () => resolve(opening.result); opening.onerror = () => reject(opening.error); });
     try { return await new Promise<{ id: string; title: string; content: string; status: string; hiringType?: string; updatedAt: string; classification?: RoleClassification; categoryOverride?: string }[]>(resolve => { const request = db.transaction('jobs').objectStore('jobs').getAll(); request.onsuccess = () => resolve(request.result); }); }
     finally { db.close(); }
   });
@@ -75,7 +75,7 @@ test('分析期间修改JD或删除岗位时跳过旧结果，保留最新投递
   });
   await seed(page); await expect.poll(() => calls).toBe(1);
   await page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open('jdtool'); request.onsuccess = () => resolve(request.result); });
+    const db = await new Promise<IDBDatabase>(resolve => { const request = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`); request.onsuccess = () => resolve(request.result); });
     try { await new Promise<void>(resolve => { const tx = db.transaction('jobs', 'readwrite'); const table = tx.objectStore('jobs'); table.delete('ux-b'); const request = table.get('research-c'); request.onsuccess = () => table.put({ ...request.result, content: '新的岗位正文：负责后端接口开发与数据库事务设计。' }); const status = table.get('ux-a'); status.onsuccess = () => table.put({ ...status.result, status: '已投递' }); tx.oncomplete = () => resolve(); }); } finally { db.close(); }
   });
   release();
@@ -101,10 +101,10 @@ test('自动归类失败后可直接重试并保存，无需应用建议', async
 test('历史数据库中的校园招聘自动统一，手动编辑保存也使用校招', async ({ page }) => {
   await seed(page, true);
   await page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>(resolve => { const opening = indexedDB.open('jdtool'); opening.onsuccess = () => resolve(opening.result); });
+    const db = await new Promise<IDBDatabase>(resolve => { const opening = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`); opening.onsuccess = () => resolve(opening.result); });
     try { await new Promise<void>(resolve => { const tx = db.transaction('jobs', 'readwrite'); const table = tx.objectStore('jobs'); const request = table.get('ux-a'); request.onsuccess = () => table.put({ ...request.result, hiringType: '校园招聘' }); tx.oncomplete = () => resolve(); }); } finally { db.close(); }
   });
-  await page.reload(); await expect(page.getByRole('button', { name: '体验6个示例岗位' })).toBeEnabled();
+  await page.reload(); await page.getByRole('button', { name: '岗位清单', exact: true }).click(); await expect(page.getByRole('button', { name: '体验6个示例岗位' })).toBeEnabled();
   expect((await saved(page)).every(job => job.hiringType === '校招')).toBe(true);
   expect((await saved(page)).every(job => job.updatedAt === now)).toBe(true);
   await page.getByRole('button', { name: '交互设计师', exact: true }).click(); await page.getByRole('button', { name: '编辑JD', exact: true }).click();

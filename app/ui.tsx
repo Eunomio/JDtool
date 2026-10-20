@@ -10,6 +10,9 @@ export function PlanButton({ onAdd }: { onAdd: () => void | Promise<void> }) {
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   const paths: Record<string, ReactNode> = {
+    home: <><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z" /><path d="M9 21v-8h6v8" /></>,
+    menu: <><path d="M4 6h16M4 12h16M4 18h16" /></>,
+    detail: <><rect x="4" y="3" width="16" height="18" rx="3" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
     jobs: <><rect x="4" y="6" width="16" height="15" rx="3" /><path d="M9 6V3h6v3M8 11h8M8 15h5" /></>,
     projects: <><path d="M3 7a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="M8 13h8M8 17h5" /></>,
     compare: <><rect x="3" y="4" width="7" height="16" rx="2" /><rect x="14" y="4" width="7" height="16" rx="2" /><path d="M6 8h1m10 0h1M6 12h1m10 0h1" /></>,

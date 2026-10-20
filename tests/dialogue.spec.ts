@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, test, navigate } from './fixtures';
 
 const now = new Date().toISOString();
 const job = { id: 'dialogue-job', title: '产品经理', company: '示例公司', content: '负责产品需求分析、用户反馈整理和需求优先级评估。', status: '关注中', nextAction: '', createdAt: now, updatedAt: now };
@@ -15,7 +15,7 @@ test('岗位体验的角色与发消息说明在气泡外，首条及后续消�
   await page.getByText('资料备份', { exact: true }).click(); page.once('dialog', dialog => dialog.accept());
   await page.getByLabel('选择备份文件').setInputFiles({ name: 'dialogue.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'jdtool-backup', version: 2, jobs: [job] })) });
   await expect(page.getByText('备份已恢复。', { exact: true })).toBeVisible(); await page.getByText('资料备份', { exact: true }).click();
-  await page.getByRole('button', { name: '岗位体验', exact: true }).click();
+  await navigate(page, '岗位体验');
   const first = page.locator('.colleague-message').first();
   await expect(first.locator('.colleague-bubble')).toHaveText(message);
   await expect(first.locator('.colleague-meta strong')).toHaveText('产品经理');
@@ -28,7 +28,7 @@ test('岗位体验的角色与发消息说明在气泡外，首条及后续消�
   await expect(page.locator('.work-exchange .colleague-bubble')).toHaveText(reply);
   await expect(page.locator('.work-exchange .colleague-meta > span')).toHaveText('回复道');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.reload(); await page.getByRole('button', { name: '岗位体验', exact: true }).click();
+  await page.reload(); await navigate(page, '岗位体验');
   await expect(page.locator('.colleague-bubble').first()).toHaveText(message);
   await expect(page.locator('.work-exchange .colleague-bubble')).toHaveText(reply);
 });

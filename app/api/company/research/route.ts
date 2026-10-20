@@ -1,3 +1,4 @@
+import { requireUser } from '../../../../lib/account-server';
 import { researchCompany, researchInput } from '../../../../lib/company-research';
 import { AppError, errorResponse, readJson } from '../../../../lib/errors';
 import { limitRequest } from '../../../../lib/usage';
@@ -9,6 +10,7 @@ export const maxDuration = 150;
 let activeResearch = 0;
 export async function POST(request: Request) {
   try {
+    await requireUser(request);
     limitRequest(request);
     const input = researchInput.safeParse(await readJson(request, 180000));
     if (!input.success) throw new AppError(400, 'INVALID_COMPANY', '请先补充公司名称，再搜索业务资料。');

@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, test, installWorkflowContext } from './fixtures';
 import { readFile } from 'node:fs/promises';
 
 test('导出资料后可在独立浏览器恢复岗位', async ({ page, browser }) => {
@@ -9,6 +9,7 @@ test('导出资料后可在独立浏览器恢复岗位', async ({ page, browser 
   const download = await downloading; const data = await readFile((await download.path())!);
   expect(JSON.parse(data.toString()).jobs).toHaveLength(6);
   const other = await browser.newContext();
+  await installWorkflowContext(other);
   try {
     const restored = await other.newPage(); await restored.goto('http://127.0.0.1:7860');
     await restored.getByText('资料备份', { exact: true }).click();

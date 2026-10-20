@@ -30,7 +30,7 @@ test('自动公司研究保留来源与岗位关联，刷新复用结果，准�
   await expect(page.getByText('已读取网页', { exact: true })).toBeVisible();
   await page.getByRole('tab', { name: /面试准备/ }).click(); await page.getByRole('button', { name: '生成岗位准备卡' }).click();
   await expect(page.getByRole('heading', { name: '岗位看重什么', exact: true })).toBeVisible();
-  await page.reload(); await page.getByRole('button', { name: job.title, exact: true }).click();
+  await page.reload(); await page.getByRole('button', { name: '岗位清单', exact: true }).click(); await page.getByRole('button', { name: job.title, exact: true }).click();
   await expect(page.getByText(result.research.summary, { exact: true })).toBeVisible(); expect(requests).toBe(1);
   await page.getByText('资料备份', { exact: true }).click(); const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: '导出备份' }).click();
   const download = await downloading; const { readFile } = await import('node:fs/promises'); const data = JSON.parse(await readFile((await download.path())!, 'utf8')); expect(data.sources[0].kind).toBe('web'); expect(data.companies[0].data.research.summary).toBe(result.research.summary);

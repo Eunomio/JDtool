@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import type { Job } from '../lib/database';
+import { database, type Job } from '../lib/database';
 import { classifyAndSaveJobs, needsRoleClassification } from '../lib/role-storage';
 import { roleInputVersion } from '../lib/role-taxonomy';
 
@@ -31,7 +31,7 @@ export function useRoleClassification(jobs: Job[], ready: boolean, refresh: () =
         next.signal.throwIfAborted();
         const classify = () => classifyAndSaveJobs(eligible.slice(offset, offset + 6), next.signal, force);
         // Serializing tabs also lets a waiting tab reuse classifications already saved by another tab.
-        const result = navigator.locks ? await navigator.locks.request('jdtool-role-classification', { signal: next.signal }, classify) : await classify();
+        const result = navigator.locks ? await navigator.locks.request(`jdtool-role-classification-${database.accountId}`, { signal: next.signal }, classify) : await classify();
         saved += result.saved; missing += result.missing;
         await refreshRef.current();
         setCompleted(Math.min(offset + 6, eligible.length));

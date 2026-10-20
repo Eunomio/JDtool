@@ -1,3 +1,4 @@
+import { requireUser } from '../../../../lib/account-server';
 import { z } from 'zod';
 import { AppError, errorResponse, readJson } from '../../../../lib/errors';
 import { parseJob } from '../../../../lib/job-parser';
@@ -14,6 +15,7 @@ const inputSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    await requireUser(request);
     limitRequest(request);
     return await withModelRequest(request, async () => {
       const validated = inputSchema.safeParse(await readJson(request));

@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, test, navigate } from './fixtures';
 
 const feedback = { strengths: ['先核对问题与证据'], dimensions: [{ name: '需求判断', feedback: '能区分数据口径与用户问题，建议补充验证指标。', requirementIds: ['iflytek-pm-d0'] }], improvements: ['补充验证周期'], outline: ['明确问题', '说明行动与验证计划'], nextActions: ['补充一个可验证的成功指标'] };
 const advice = { text: '梳理一个需求分析项目', reason: '对应目标岗位的需求分析职责', requirementIds: ['iflytek-pm-d0'], factIds: ['sample-p1-f1'], sourceIds: [] };
@@ -57,7 +57,7 @@ test('相近与跨方向比较形成各岗位准备任务', async ({ page }) => 
     const body = route.request().postDataJSON(); expect(body.action).toBe('compare');
     await route.fulfill({ json: { common: [advice], differences: body.jobs.map((job: { id: string }) => ({ jobId: job.id, uniqueRequirements: [], projects: [], preparation: [advice] })), reusable: [advice] } });
   });
-  await seedJobs(page); await page.getByRole('button', { name: '岗位比较', exact: true }).click();
+  await seedJobs(page); await navigate(page, '岗位比较');
   await page.getByRole('checkbox', { name: /vivo/ }).check(); await page.getByRole('checkbox', { name: /蔚来 · 人机工程师/ }).check();
   await page.getByRole('button', { name: '比较所选岗位' }).click();
   await expect(page.getByRole('heading', { name: '比较结果', exact: true })).toBeVisible();
@@ -74,18 +74,18 @@ test('面试一次追问、复盘保存与两决策剧情', async ({ page }) => 
     const input = route.request().postDataJSON();
     await route.fulfill({ json: input.action === 'interview' ? input.stage === 'followup' ? { followup: '你会如何验证改进的效果？', feedback: null } : { followup: '', feedback } : input.stage === 'review' ? { dialogue: '', consequence: '', feedback } : { dialogue: '我可以提供按用户群划分的使用情况。', consequence: '团队获得了下一轮验证的依据。', feedback: null } });
   });
-  await seedJobs(page); await page.getByRole('button', { name: '模拟面试', exact: true }).click();
+  await seedJobs(page); await navigate(page, '模拟面试');
   await page.getByLabel('选择目标岗位').selectOption('sample-iflytek-pm');
   await page.getByLabel('我的回答').fill('核对数据口径并分析用户分群。');
   await page.getByRole('button', { name: '提交回答，获得追问' }).click();
   await expect(page.getByText('你会如何验证改进的效果？', { exact: true })).toBeVisible();
   await page.getByLabel('补充回答').fill('先小范围验证任务完成率。'); await page.getByRole('button', { name: '提交补充，查看复盘' }).click();
   await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '岗位体验', exact: true }).click();
+  await navigate(page, '岗位体验');
   await page.getByRole('radio').first().check(); await page.getByRole('button', { name: '提交行动', exact: true }).click();
   await page.getByRole('button', { name: '继续下一项任务' }).click();
   await page.getByRole('radio').first().check(); await page.getByRole('button', { name: '提交行动', exact: true }).click();
   await page.getByRole('button', { name: '查看任务复盘' }).click(); await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
-  await page.reload(); await page.getByRole('button', { name: '岗位体验', exact: true }).click(); await page.getByLabel('选择目标岗位').selectOption('sample-iflytek-pm');
+  await page.reload(); await navigate(page, '岗位体验'); await page.getByLabel('选择目标岗位').selectOption('sample-iflytek-pm');
   await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
 });

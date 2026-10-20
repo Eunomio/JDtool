@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import type { RoleCategoryId, RoleClassification } from './role-taxonomy';
+import type { SyncState } from './workspace-data';
 
 export const statuses = ['关注中', '准备投递', '已投递', '笔试/测评', '面试中', '已获Offer', '已结束'] as const;
 export type JobStatus = typeof statuses[number];
@@ -52,7 +53,8 @@ export type Task = { id: string; text: string; jobIds: string[]; done: boolean; 
 export type PracticeFeedback = { strengths: string[]; dimensions: { name: string; feedback: string; requirementIds: string[] }[]; improvements: string[]; outline: string[]; nextActions: string[] };
 export type PracticeSession = { id: string; jobId: string; type: 'interview' | 'scenario'; inputVersion: string; data: Record<string, unknown>; updatedAt: string };
 
-class JobDatabase extends Dexie {
+export class JobDatabase extends Dexie {
+  sync!: Table<SyncState, string>;
   jobs!: Table<Job, string>;
   projects!: Table<Project, string>;
   sources!: Table<Source, string>;
@@ -63,15 +65,23 @@ class JobDatabase extends Dexie {
   tasks!: Table<Task, string>;
   practice!: Table<PracticeSession, string>;
 
-  constructor() {
-    super('jdtool');
+  constructor(public accountId = 'legacy', public accountRole: 'admin' | 'member' | 'legacy' = 'legacy') {
+    super(accountId === 'legacy' ? 'jdtool' : `jdtool-${accountId}`);
     this.version(1).stores({ jobs: 'id, status, updatedAt' });
     this.version(2).stores({
       jobs: 'id, status, updatedAt', projects: 'id, name, updatedAt', sources: 'id, jobId',
       recommendations: 'id, jobId, createdAt', preparations: 'id, jobId, createdAt', companies: 'id, jobId, createdAt',
       comparisons: 'id, jobId, createdAt', tasks: 'id, order', practice: 'id, jobId, type, updatedAt',
     });
+    this.version(3).stores({ sync: 'id' });
   }
 }
 
-export const database = new JobDatabase();
+export let database = new JobDatabase();
+export function selectAccountDatabase(accountId: string, role: 'admin' | 'member' = 'member') {
+  if (database.accountId === accountId) return database;
+  if (database.accountId !== 'legacy') throw new Error('请刷新页面后切换账号。');
+  database.close(); database = new JobDatabase(accountId, role); return database;
+}
+export const accountStorageKey = (key: string) => `${key}:${database.accountId}`;
+export function accountRequestHeaders(): Record<string, string> { return database.accountId === 'legacy' ? {} : { 'X-Account-Id': database.accountId }; }

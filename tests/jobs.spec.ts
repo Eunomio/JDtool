@@ -22,7 +22,7 @@ test('保存、刷新、修改状态、编辑与删除撤销', async ({ page }) 
   await expect(page.getByLabel('产品经理投递状态')).toHaveValue('面试中');
   await page.waitForFunction(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('jdtool');
+      const request = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

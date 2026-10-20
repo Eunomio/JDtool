@@ -1,5 +1,5 @@
-import Workbench from './workbench';
+import AccountGate from './account-gate';
 
 export default function Home() {
-  return <Workbench />;
+  return <AccountGate />;
 }

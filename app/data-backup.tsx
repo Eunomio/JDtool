@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { database } from '../lib/database';
 import { parseBackup, restoreBackup } from '../lib/backup';
+import { hasDemoData, workspaceTables } from '../lib/workspace-data';
 
 export default function DataBackup({ refresh }: { refresh: () => Promise<void> }) {
   const input = useRef<HTMLInputElement>(null);
@@ -16,7 +17,7 @@ export default function DataBackup({ refresh }: { refresh: () => Promise<void> }
   async function exportData() {
     try {
       const data: Record<string, unknown> = { format: 'jdtool-backup', version: 2, exportedAt: new Date().toISOString() };
-      await database.transaction('r', database.tables, async () => { for (const table of database.tables) data[table.name] = await table.toArray(); });
+      await database.transaction('r', database.tables, async () => { for (const table of workspaceTables) data[table] = await database.table(table).toArray(); });
       const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
       const link = document.createElement('a'); link.href = url; link.download = `求职准备备份-${new Date().toISOString().slice(0, 10)}.json`; link.style.display = 'none'; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000); setMessage('已导出。备份含个人资料，请妥善保存。');
     } catch { setMessage('导出未完成，请重试。'); }
@@ -25,6 +26,7 @@ export default function DataBackup({ refresh }: { refresh: () => Promise<void> }
     try {
       if (file.size > 80_000_000) throw new Error('备份文件过大。');
       const data = parseBackup(JSON.parse(await file.text()));
+      if (database.accountRole !== 'admin' && hasDemoData(data)) throw new Error('示例资料仅供管理员使用，请选择自己的资料备份。');
       if (!window.confirm('导入会合并记录，同一编号将使用备份中的内容。继续吗？')) return;
       await restoreBackup(data);
       await refresh(); setMessage('备份已恢复。');

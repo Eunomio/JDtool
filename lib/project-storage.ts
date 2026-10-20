@@ -1,6 +1,6 @@
-import { database, type Project, type RecommendationResult, type SavedResult } from './database';
+import { database, accountStorageKey, type Project, type RecommendationResult, type SavedResult } from './database';
 
-export function projectDeletionVersion() { return localStorage.getItem('jdtool-projects-deleted'); }
+export function projectDeletionVersion() { return localStorage.getItem(accountStorageKey('jdtool-projects-deleted')); }
 
 export function adviceTexts(values: unknown[]) {
   const texts = new Set<string>();
@@ -30,7 +30,7 @@ export async function saveProject(project: Project) {
 // Generated records used the whole confirmed project library, including uncited facts.
 export async function deleteProjects(projectId?: string) {
   // Invalidate undo copies in other tabs before their queued writes can restore data.
-  localStorage.setItem('jdtool-projects-deleted', crypto.randomUUID());
+  localStorage.setItem(accountStorageKey('jdtool-projects-deleted'), crypto.randomUUID());
   await database.transaction('rw', database.tables, async () => {
     const existing = new Set((await database.projects.toArray()).map((project) => project.id));
     const affected = (record: { projectVersions?: { id: string }[] }) => !projectId || !record.projectVersions || record.projectVersions.some((project) => project.id === projectId || !existing.has(project.id));

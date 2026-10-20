@@ -14,6 +14,8 @@ import { parseJob } from '../lib/job-parser';
 import { parseBackup } from '../lib/backup';
 import { normalizeHiringType } from '../lib/job-normalization';
 import { splitDialogue } from '../lib/dialogue';
+import { authenticateAccount, createSession } from '../lib/account-server';
+import { accountCookie } from '../lib/account-types';
 
 function setEnvironment(values: Record<string, string | undefined>) {
   const original = Object.fromEntries(Object.keys(values).map((name) => [name, process.env[name]]));
@@ -25,6 +27,11 @@ test.beforeEach(() => {
   // Never let local credentials influence provider selection in mocked regressions.
   process.env.MODEL_PROVIDER = 'chatecnu';
   process.env.SEARCH_PROVIDER = 'tavily';
+});
+
+test.beforeEach(async ({ request }) => {
+  const response = await request.post('/api/auth/login', { data: { username: 'admin', password: 'admin' } });
+  expect(response.ok()).toBe(true);
 });
 
 async function isolateModel() {
@@ -51,6 +58,7 @@ test('复盘缺少实际追问时在调用模型前拒绝请求', async ({ reque
 
 test('生成与事实核对共用截止时间，核对超时仍保存待核对草稿', async () => {
   const restoreEnv = await isolateModel();
+  const token = await createSession(await authenticateAccount('admin', 'admin'));
   const originalFetch = globalThis.fetch;
   const originalTimeout = AbortSignal.timeout;
   const timers: { milliseconds: number; controller: AbortController }[] = [];
@@ -60,7 +68,7 @@ test('生成与事实核对共用截止时间，核对超时仍保存待核对�
   try {
     AbortSignal.timeout = (milliseconds) => { const controller = new AbortController(); timers.push({ milliseconds, controller }); return controller.signal; };
     globalThis.fetch = async (url, options) => {
-      if (String(url).startsWith('/api/')) return recommend(new Request('http://localhost/api/project-recommendations', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': crypto.randomUUID() }, body: options?.body, signal: options?.signal }));
+      if (String(url).startsWith('/api/')) return recommend(new Request('http://localhost/api/project-recommendations', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': crypto.randomUUID(), cookie: `${accountCookie}=${token}` }, body: options?.body, signal: options?.signal }));
       upstreamCalls++;
       if (upstreamCalls === 1) return Response.json({ choices: [{ message: { content: JSON.stringify(data) }, finish_reason: 'stop' }] });
       auditSignal = options?.signal || undefined;

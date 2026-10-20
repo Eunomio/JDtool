@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { expect, test, installWorkflowContext, type Page, navigate } from './fixtures';
 import { readFile } from 'node:fs/promises';
 
 const now = '2026-10-20T08:00:00.000Z';
@@ -37,7 +37,7 @@ async function assemble(page: Page) {
 
 async function stored(page: Page, table: string) {
   return page.evaluate((table) => new Promise<Record<string, unknown>[]>((resolve, reject) => {
-    const open = indexedDB.open('jdtool'); open.onerror = () => reject(open.error);
+    const open = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`); open.onerror = () => reject(open.error);
     open.onsuccess = () => { const database = open.result; const get = database.transaction(table).objectStore(table).getAll(); get.onerror = () => reject(get.error); get.onsuccess = () => { resolve(get.result); database.close(); }; };
   }), table);
 }
@@ -76,6 +76,7 @@ test('清除项目时清除生成文案及关联计划，保留岗位并可完�
   const file = await downloading; const fullBackup = JSON.parse((await readFile((await file.path())!)).toString());
   await page.getByText('资料备份', { exact: true }).click();
   const context = await browser.newContext();
+  await installWorkflowContext(context);
   try {
     const other = await context.newPage(); await importBackup(other, fullBackup); await openJob(other);
     await other.getByRole('tab', { name: /面试准备/ }).click();
@@ -97,7 +98,7 @@ test('删除单个项目保留其他项目，复制前重新检查记录是否�
   const other = { ...project, id: 'other-project', name: '另一个真实项目', facts: [{ ...project.facts[0], id: 'other-f1' }] };
   await importBackup(page, { ...backup, projects: [project, other] }); await assemble(page);
   // Simulate deletion in another tab while this page still shows the adopted version.
-  await page.evaluate(() => new Promise<void>((resolve) => { const open = indexedDB.open('jdtool'); open.onsuccess = () => { const db = open.result; const transaction = db.transaction('projects', 'readwrite'); transaction.objectStore('projects').delete('review-project'); transaction.oncomplete = () => { db.close(); resolve(); }; }; }));
+  await page.evaluate(() => new Promise<void>((resolve) => { const open = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`); open.onsuccess = () => { const db = open.result; const transaction = db.transaction('projects', 'readwrite'); transaction.objectStore('projects').delete('review-project'); transaction.oncomplete = () => { db.close(); resolve(); }; }; }));
   await page.getByRole('button', { name: '复制已采用的表述' }).click();
   await expect(page.locator('main').getByRole('alert')).toContainText('请先核对当前项目事实');
   await page.reload(); await page.getByRole('button', { name: '我的项目', exact: true }).click();
@@ -122,7 +123,7 @@ test('损坏、嵌套格式异常和关联缺失的备份都不能覆盖现有�
   for (const data of broken) {
     await page.getByText('资料备份', { exact: true }).click();
     await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({ name: 'broken.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
-    await expect(page.getByRole('status')).toContainText('现有资料未被修改');
+    await expect(page.locator('.backup-menu').getByRole('status')).toContainText('现有资料未被修改');
     await page.getByText('资料备份', { exact: true }).click();
     expect((await stored(page, 'jobs'))[0].title).toBe(job.title);
   }
@@ -185,7 +186,7 @@ test('重启练习保留JD题目，JD更新后重新生成对应题目，并保�
     else if (input.stage === 'followup') await route.fulfill({ json: { followup: '请解释序列化隔离级别。', feedback: null } });
     else { expect(input.followup).toBe('请解释序列化隔离级别。'); expect(input.supplement).toBe('避免并发事务出现不一致。'); await route.fulfill({ json: { followup: '', feedback } }); }
   });
-  await importBackup(page); await page.getByRole('button', { name: '模拟面试', exact: true }).click();
+  await importBackup(page); await navigate(page, '模拟面试');
   await expect(page.getByText(exercise.question, { exact: true })).toBeVisible();
   const restart = page.getByRole('button', { name: '重新开始', exact: true }); await expect(restart).toBeEnabled();
   page.once('dialog', (dialog) => dialog.accept()); await restart.click();
@@ -197,7 +198,7 @@ test('重启练习保留JD题目，JD更新后重新生成对应题目，并保�
   await openJob(page); await page.getByRole('button', { name: '编辑JD', exact: true }).click();
   await page.getByRole('textbox', { name: '岗位原文', exact: true }).fill('职责：设计消息队列的可靠投递机制。要求：掌握队列事务。');
   await page.getByRole('button', { name: '保存岗位', exact: true }).click();
-  await page.getByRole('button', { name: '模拟面试', exact: true }).last().click();
+  await navigate(page, '模拟面试');
   await expect(page.getByText('岗位或公司资料已更新，这份记录来自更新前的练习，可重新开始。', { exact: true })).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept()); await page.getByRole('button', { name: '重新开始', exact: true }).click();
   await expect(page.getByText('如何保证消息队列的可靠投递？', { exact: true })).toBeVisible(); expect(exercises).toBe(2);
@@ -205,7 +206,7 @@ test('重启练习保留JD题目，JD更新后重新生成对应题目，并保�
 
 test('题目生成失败时保留目标岗位并提供重试，不展示无关通用题', async ({ page }) => {
   await page.route('**/api/assist', (route) => route.fulfill({ status: 503, json: { error: { message: '暂时无法准备题目，请重试。' } } }));
-  await importBackup(page); await page.getByRole('button', { name: '模拟面试', exact: true }).click();
+  await importBackup(page); await navigate(page, '模拟面试');
   await expect(page.locator('main').getByRole('alert')).toContainText('暂时无法准备题目');
   await expect(page.getByText(/使用率下降和两类新需求/)).toHaveCount(0);
   await page.route('**/api/assist', (route) => route.fulfill({ json: exercise }));
@@ -217,7 +218,7 @@ test('任务写入被阻塞时立即刷新，暂存操作仍能恢复', async ({
   await importBackup(page, { ...backup, tasks: [{ id: 'review-task', text: '检查事务', jobIds: [job.id], done: false, order: 0, createdAt: now }] });
   const locker = await context.newPage(); await locker.goto('/api/health');
   await locker.evaluate(() => new Promise<void>((resolve) => {
-    const open = indexedDB.open('jdtool');
+    const open = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`);
     open.onsuccess = () => { const db = open.result; const transaction = db.transaction('tasks', 'readwrite'); const store = transaction.objectStore('tasks'); let first = true;
       const hold = () => { const read = store.get('review-task'); read.onsuccess = () => { if (first) { first = false; resolve(); } if (!(window as unknown as { release: boolean }).release) hold(); }; }; hold(); transaction.oncomplete = () => db.close();
     };
