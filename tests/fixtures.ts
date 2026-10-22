@@ -14,6 +14,7 @@ export async function installWorkflowContext(context: BrowserContext) {
   const user = { id: `workflow-${crypto.randomUUID()}`, username: 'admin', role: 'admin' };
   let data = emptyWorkspace(); let revision = 0;
   const applied = new Set<string>();
+  await context.route('**/api/onboarding', route => route.fulfill({ json: { show: false, seen: true, status: 'completed' } }));
   await context.route('**/api/auth/session', route => route.fulfill({ json: { user } }));
   await context.route('**/api/workspace', async route => {
     if (route.request().method() === 'POST') {

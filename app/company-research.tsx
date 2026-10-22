@@ -7,7 +7,7 @@ import { AdviceList } from './evidence';
 import { Icon } from './ui';
 
 const steps = ['确定搜索方向', '搜索公开资料', '核对网页来源', '关联岗位职责'];
-export default function CompanyResearch({ job, projects, sources, refresh, addTask }: { job: Job; projects: Project[]; sources: Source[]; refresh: () => Promise<void>; addTask: (text: string, ids: string[]) => void }) {
+export default function CompanyResearch({ job, projects, sources, refresh, addTask, autoSearch = true }: { job: Job; projects: Project[]; sources: Source[]; refresh: () => Promise<void>; addTask: (text: string, ids: string[]) => void; autoSearch?: boolean }) {
   const [saved, setSaved] = useState<SavedResult<CompanyResult> | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -19,7 +19,7 @@ export default function CompanyResearch({ job, projects, sources, refresh, addTa
   const controller = useRef<AbortController | null>(null); const attempted = useRef(false);
   const version = inputVersion(job, [], sources);
   useEffect(() => { let cancelled = false; database.companies.where('jobId').equals(job.id).sortBy('createdAt').then((items) => { if (!cancelled) { setSaved(items.at(-1) || null); setLoaded(true); } }); return () => { cancelled = true; controller.current?.abort(); }; }, [job.id]);
-  useEffect(() => { if (loaded && (!saved?.data.research || saved.data.research.company !== job.company) && !attempted.current && !job.sample && job.company.trim()) { attempted.current = true; void search(); } }, [loaded, job.id]);
+  useEffect(() => { if (autoSearch && loaded && (!saved?.data.research || saved.data.research.company !== job.company) && !attempted.current && !job.sample && job.company.trim()) { attempted.current = true; void search(); } }, [autoSearch, loaded, job.id]);
   async function persistSources(items: Source[]) {
     if (items.some((source) => source.url && (!/^https?:\/\//i.test(source.url) || !URL.canParse(source.url)))) throw new Error('请使用完整的公开网页链接。');
     await database.transaction('rw', database.jobs, database.sources, async () => {
@@ -54,7 +54,7 @@ export default function CompanyResearch({ job, projects, sources, refresh, addTa
   }
   async function run(task: () => Promise<void>) { setBusy(true); setError(''); try { await task(); } catch (error) { setError(error instanceof Error ? error.message : '未能完成，请重试。'); } finally { setBusy(false); } }
   const stale = saved && saved.inputVersion !== version;
-  return <section className="panel company-research" aria-labelledby="company-heading"><div className="section-heading"><div><h2 id="company-heading">了解公司，读懂岗位背后的业务</h2>{!job.company.trim() && <p className="muted">请先补充公司名称。</p>}</div><button className={saved ? 'secondary' : 'primary'} disabled={busy || !loaded || !job.company.trim()} onClick={search}><Icon name="search" size={16} />{busy ? '正在研究公司…' : saved ? '更新公司研究' : '搜索公司业务'}</button></div>
+  return <section data-tour="company-research" className="panel company-research" aria-labelledby="company-heading"><div className="section-heading"><div><h2 id="company-heading">了解公司，读懂岗位背后的业务</h2>{!job.company.trim() && <p className="muted">请先补充公司名称。</p>}</div><button className={saved ? 'secondary' : 'primary'} disabled={busy || !loaded || !job.company.trim()} onClick={search}><Icon name="search" size={16} />{busy ? '正在研究公司…' : saved ? '更新公司研究' : '搜索公司业务'}</button></div>
     {busy && controller.current && <div className="research-progress" role="status"><div className="research-steps">{steps.map((label, index) => <span key={label} className={step === index ? 'current' : step > index ? 'done' : ''}><b>{step > index ? <Icon name="check" size={12} /> : index + 1}</b>{label}</span>)}</div><p><span className="activity-dot" />{progress}</p>{queries.map((query) => <small key={query}>{query}</small>)}<button className="text-button" onClick={() => { controller.current?.abort(); setProgress(''); }}>停止搜索</button></div>}
     {error && <div className="notice error" role="alert">{error}<button className="text-button" disabled={busy} onClick={search}>重试搜索</button></div>}
     {!saved && !busy && !error && <div className="research-empty"><Icon name="globe" size={36} /><div><h3>把公司背景，变成你的准备优势</h3><p>自动查找公开资料，整理公司业务、岗位关联和面试中值得确认的问题。</p></div></div>}

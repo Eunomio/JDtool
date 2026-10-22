@@ -49,6 +49,7 @@ export async function accountStore() {
       CREATE TABLE IF NOT EXISTS accounts (id TEXT PRIMARY KEY, username TEXT NOT NULL, username_key TEXT NOT NULL UNIQUE, password TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','member')));
       CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id), expires_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS workspaces (account_id TEXT PRIMARY KEY REFERENCES accounts(id), revision INTEGER NOT NULL, data TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS account_onboarding (account_id TEXT PRIMARY KEY REFERENCES accounts(id), first_seen_at TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('started','skipped','completed')), updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS workspace_requests (account_id TEXT NOT NULL, request_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(account_id, request_id));`);
     store = { db, ready: seedAccounts(db) }; stores.set(directory, store);
   }

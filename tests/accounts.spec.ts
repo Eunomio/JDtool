@@ -17,6 +17,10 @@ async function signIn(page: Page, name: string, mode: 'login' | 'register' = 're
   await page.getByLabel('账号', { exact: true }).fill(name); await page.getByLabel('密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: mode === 'login' ? '登录并继续准备' : '注册并开始准备', exact: true }).click();
   await expect(page.getByRole('button', { name: '返回首页', exact: true })).toBeVisible();
+  await expect.poll(async () => { const id = await page.evaluate(() => localStorage.getItem('jdtool-active-account')); return (await (await page.request.get('/api/onboarding', { headers: { 'X-Account-Id': id! } })).json()).seen; }).toBe(true);
+  const close = page.getByRole('button', { name: '关闭新手教程', exact: true });
+  if (mode === 'register') await expect(close).toBeVisible();
+  if (await close.isVisible()) await close.click();
 }
 async function addJob(page: Page, title: string) {
   await page.getByRole('button', { name: '新增JD', exact: true }).first().click(); await page.getByRole('tab', { name: '粘贴正文', exact: true }).click();

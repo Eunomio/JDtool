@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { database, accountRequestHeaders, type Job } from '../lib/database';
 import { prepareImage, type UploadImage } from '../lib/image-upload';
 import type { ParsedJob } from '../lib/job-parser';
@@ -17,8 +17,8 @@ function fromJob(job: Job): Draft {
     sourceUrl: job.sourceUrl || '', sourceType: job.sourceType || 'text', parsedAt: job.parsedAt, classification: job.classification };
 }
 
-export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen }: {
-  ready: boolean; editing: Job | null; onSaved: (job: Job) => Promise<void>; onCancel: () => void; onOpen: (job: Job) => void;
+export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen, onStageChange }: {
+  ready: boolean; editing: Job | null; onSaved: (job: Job) => Promise<void>; onCancel: () => void; onOpen: (job: Job) => void; onStageChange?: (stage: 'input' | 'review') => void;
 }) {
   const [mode, setMode] = useState<Mode>(editing?.sourceType || (editing ? 'text' : 'link'));
   const [url, setUrl] = useState(editing?.sourceUrl || '');
@@ -31,6 +31,8 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
   const [duplicate, setDuplicate] = useState<Job | null>(null);
   const [allowDuplicate, setAllowDuplicate] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const reviewing = !!draft;
+  useEffect(() => { onStageChange?.(reviewing ? 'review' : 'input'); }, [reviewing, onStageChange]);
 
   async function addImages(files: File[]) {
     setError('');
@@ -92,7 +94,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
     finally { setBusy(false); }
   }
 
-  if (draft) return <section className="panel import-panel">
+  if (draft) return <section data-tour="jd-review" className="panel import-panel">
     <div className="import-steps" aria-label="添加岗位进度"><span className="done"><Icon name="check" size={13} />提供岗位</span><span aria-current="step"><b>2</b>核对内容</span><span><b>3</b>开始准备</span></div>
     <div className="section-heading"><div><h2>{editing ? '编辑岗位' : '识别完成，请核对后保存'}</h2></div><div><button className="text-button" disabled={busy} onClick={() => setDraft(null)}>重新解析原始资料</button><button className="text-button" disabled={busy} onClick={() => { if (editing) onCancel(); else setDraft(null); }}>{editing ? '取消编辑' : '返回输入'}</button></div></div>
     {error && <p role="alert" className="notice error">{error}</p>}
@@ -107,7 +109,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen 
     </form>
   </section>;
 
-  return <section className="panel import-panel import-start">
+  return <section data-tour="jd-input" className="panel import-panel import-start">
     <div className="import-steps" aria-label="添加岗位进度"><span aria-current="step"><b>1</b>提供岗位</span><span><b>2</b>核对内容</span><span><b>3</b>开始准备</span></div>
     <div className="import-intro"><span className="import-symbol"><Icon name={mode === 'images' ? 'image' : 'link'} size={27} /></span><h2>发来岗位，我们一起拆解。</h2></div>
     <div role="tablist" aria-label="岗位输入方式" className="tabs">{([['link', '岗位链接'], ['images', 'JD截图'], ['text', '粘贴正文']] as const).map(([key, title]) => <button key={key} role="tab" aria-selected={mode === key} disabled={busy} onClick={() => { setMode(key); setError(''); }}>{title}</button>)}</div>

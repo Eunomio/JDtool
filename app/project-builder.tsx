@@ -72,7 +72,7 @@ export default function ProjectBuilder({ job, projects, sources }: { job: Job; p
     catch (error) { setError(error instanceof Error ? error.message : '未能保存，请重试。'); }
   }
 
-  return <section className="panel builder"><div className="section-heading"><div><h2>按岗位组装项目</h2></div><button className="primary" onClick={generate} disabled={busy || !confirmed.length}>{busy ? '正在匹配并改写…' : saved ? '重新推荐与改写' : 'AI推荐项目'}</button></div>
+  return <section data-tour="project-builder" className="panel builder"><div className="section-heading"><div><h2>按岗位组装项目</h2></div><button className="primary" onClick={generate} disabled={busy || !confirmed.length}>{busy ? '正在匹配并改写…' : saved ? '重新推荐与改写' : 'AI推荐项目'}</button></div>
     <p className="privacy-note">仅将已确认项目的事实及所选岗位用于本次推荐；可展示项目先应用脱敏替换。</p><button className="text-button" disabled={!selected.length || busy} onClick={manual}>用所选原始事实手动组装</button>
     {error && <div className="notice error" role="alert">{error}</div>}{message && <div className="notice" role="status">{message}</div>}{saved && saved.inputVersion !== version && <div className="notice">岗位或项目资料已更新，以下为旧版，可重新生成。</div>}
     <div className="builder-columns"><div><h3>1. JD要求</h3>{[...(job.requirements || []), ...(job.responsibilities || [])].map((item) => <blockquote key={item.id}><strong>{item.text}</strong><p className="muted">{item.sourceText || item.text}</p></blockquote>)}</div>

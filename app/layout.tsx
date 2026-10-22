@@ -3,6 +3,7 @@ import './globals.css';
 import './experience.css';
 import './account.css';
 import './responsive.css';
+import './onboarding.css';
 
 export const metadata: Metadata = {
   title: '岗位探索与求职准备助手',
