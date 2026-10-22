@@ -32,6 +32,77 @@ async function backup(page: Page) {
   return JSON.parse(await readFile((await (await downloading).path())!, 'utf8'));
 }
 
+async function expectGuideFits(page: Page) {
+  await expect.poll(() => page.evaluate(() => {
+    const guide = document.querySelector('.tutorial-card')!;
+    const highlight = document.querySelector('.tutorial-spotlight');
+    const main = document.getElementById('workspace-main')!;
+    if (!guide || !highlight) return { fits: false, reason: 'Guide or highlight missing' };
+    const a = guide.getBoundingClientRect(); const b = highlight.getBoundingClientRect();
+    const separate = a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+    const reserved = guide.getAttribute('data-layout') !== 'docked' || main.getBoundingClientRect().bottom <= a.top + 1;
+    return { fits: separate && reserved && a.left >= 0 && a.top >= 0 && a.right <= innerWidth + 1 && a.bottom <= innerHeight + 1 && document.documentElement.scrollWidth <= innerWidth,
+      separate, reserved, step: guide.closest('.tutorial-layer')?.getAttribute('data-step'), viewport: [innerWidth, innerHeight], card: a.toJSON(), highlight: b.toJSON(), main: main.getBoundingClientRect().toJSON() };
+  }).then(result => result.fits ? 'fits' : JSON.stringify(result))).toBe('fits');
+}
+
+test('每一步在窄窗口、手机和横屏切换后，教程与高亮内容不重叠，底部引导占用独立空间', async ({ page }) => {
+  test.setTimeout(90000);
+  await signIn(page, username());
+  const sizes = test.info().project.name === 'mobile'
+    ? [[320, 740], [390, 844], [844, 390], [390, 480]]
+    : [[900, 650], [1024, 640], [1280, 720], [1920, 900]];
+  for (let step = 0; step < 13; step++) {
+    for (const [width, height] of sizes) {
+      await page.setViewportSize({ width, height }); await expectGuideFits(page);
+    }
+    await card(page).locator('.tutorial-card-actions > .primary').click();
+  }
+  await expect(card(page)).toHaveCount(0);
+  expect(await page.evaluate(() => ({ active: document.documentElement.dataset.tutorialActive, height: document.documentElement.style.getPropertyValue('--tutorial-shell-height') }))).toEqual({ active: undefined, height: '' });
+});
+
+test('底部引导展开说明会缩小上方页面，JD和练习可直接滚动操作，收起和退出后布局正常', async ({ page }) => {
+  const mobile = test.info().project.name === 'mobile';
+  await page.setViewportSize(mobile ? { width: 320, height: 740 } : { width: 1024, height: 640 });
+  await signIn(page, username()); await advanceTo(page, 'input');
+  await expectGuideFits(page); await expect(card(page)).toHaveAttribute('data-layout', 'docked');
+  if (mobile) {
+    await expect(card(page).locator('#tutorial-description')).toBeHidden();
+    const before = (await page.locator('#workspace-main').boundingBox())!.height;
+    await card(page).getByRole('button', { name: '展开说明', exact: true }).click();
+    await expect(card(page).locator('#tutorial-description')).toBeVisible(); await expectGuideFits(page);
+    await expect.poll(async () => (await page.locator('#workspace-main').boundingBox())!.height).toBeLessThan(before);
+  }
+  const view = caseView(page);
+  await view.getByLabel('招聘页面链接').fill('https://careers.example.com/experience-design');
+  await view.getByRole('button', { name: '读取并解析', exact: true }).click();
+  await expect(page.locator('.tutorial-layer')).toHaveAttribute('data-step', 'review'); await expectGuideFits(page);
+  await view.getByLabel('岗位名称', { exact: true }).fill('在窄屏中核对的岗位');
+  await view.getByRole('button', { name: '保存岗位', exact: true }).click();
+  await expect(page.locator('.tutorial-layer')).toHaveAttribute('data-step', 'requirements');
+  await advanceTo(page, 'interview');
+  await view.getByRole('textbox', { name: '我的回答', exact: true }).click();
+  await view.getByRole('button', { name: '提交回答，获得追问', exact: true }).click();
+  await expect(view.getByText('面试官追问', { exact: true })).toBeVisible();
+  const scrolled = await page.locator('#workspace-main').evaluate(element => element.scrollTop);
+  await card(page).getByRole('button', { name: '收起引导', exact: true }).click();
+  await expect(card(page)).toHaveAttribute('role', 'complementary');
+  await expect.poll(() => page.locator('#workspace-main').evaluate(element => element.scrollTop)).toBe(scrolled);
+  await card(page).getByRole('button', { name: '继续引导', exact: true }).click();
+  await expectGuideFits(page);
+  await view.getByRole('button', { name: '提交补充，查看复盘', exact: true }).click();
+  await expect(view.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
+  await advanceTo(page, 'scenario');
+  await view.getByRole('radio').first().check(); await view.getByRole('button', { name: '提交行动', exact: true }).click();
+  await expect(view.locator('.work-impact')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(card(page)).toHaveCount(0);
+  expect(await page.evaluate(() => ({ active: document.documentElement.dataset.tutorialActive, short: document.documentElement.dataset.tutorialShort, styles: [...document.documentElement.style].filter(name => name.startsWith('--tutorial-')) }))).toEqual({ active: undefined, short: undefined, styles: [] });
+  await page.getByRole('button', { name: '新增JD', exact: true }).click();
+  await expect(page.getByLabel('招聘页面链接')).toHaveValue('');
+});
+
 test('首次自动展示与跨浏览器记录保留，首页可重开，手机蒙版与键盘可用', async ({ page, browser }) => {
   const name = username(); await signIn(page, name);
   await expect(card(page).getByRole('heading', { name: '从添加岗位开始' })).toBeVisible();
