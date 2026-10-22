@@ -12,7 +12,7 @@ const job: Job = {
   requirements: requirements.map((text, index) => ({ id: `tutorial-r${index + 1}`, text, sourceText: text })),
   status: '准备投递', nextAction: '整理一个从发现问题到验证方案的完整案例', createdAt: date, updatedAt: date,
 };
-job.classification = { categoryId: 'experience_design', confidence: 'high', reason: '职责重点是核心流程、交互原型和可用性验证，因此归为用户体验设计。', evidence: responsibilities, inputVersion: roleInputVersion(job), classifiedAt: date };
+job.classification = { categoryId: 'experience_design', confidence: 'high', reason: 'JD以交互方案设计和可用性测试为主，归为用户体验设计。', evidence: responsibilities, inputVersion: roleInputVersion(job), classifiedAt: date };
 const project: Project = {
   id: 'tutorial-project', name: '校园活动报名流程优化', type: '课程项目', stage: '已测试', timeline: '大三课程项目', role: '用户研究与交互设计',
   problem: '同学找不到报名入口，填写表单时反复返回查找说明。', actions: '访谈同学，梳理报名路径，设计原型并组织可用性测试。', methods: '用户访谈、任务流程、交互原型、可用性测试', results: '完成原型测试，整理入口与表单说明的改进建议。',
@@ -26,22 +26,22 @@ const sources: Source[] = [{ id: 'tutorial-source', jobId: job.id, label: '星�
 function advice(text: string, reason: string, requirementIds = ['tutorial-r1'], factIds: string[] = [], sourceIds: string[] = []): Advice { return { text, reason, requirementIds, factIds, sourceIds }; }
 const company: CompanyResult = {
   facts: [advice('为小型团队提供任务管理与项目协作工具', '理解目标用户是项目负责人和团队成员。', [], [], ['tutorial-source'])],
-  businesses: [advice('围绕创建任务、分配负责人和跟进进度设计产品', '先理解用户需要完成的任务，再分析页面和流程。', [], [], ['tutorial-source'])],
-  roleInsights: [advice('这个岗位需要改善新成员首次创建任务的体验', '对应JD中的核心流程设计与可用性验证。', ['tutorial-d1', 'tutorial-r2'], [], ['tutorial-source'])],
-  hypotheses: [advice('可能需要区分负责人和普通成员的操作习惯', '两类用户的任务不同，具体研究安排可在面试时确认。', ['tutorial-r2'], [], ['tutorial-source'])],
-  questions: [advice('团队目前如何判断首次创建任务的体验是否改善？', '了解现有研究方式、观察指标和设计协作流程。', ['tutorial-r2'], [], ['tutorial-source'])],
+  businesses: [advice('提供任务分配和项目进度管理工具', '主要供小型团队的项目负责人和成员使用。', [], [], ['tutorial-source'])],
+  roleInsights: [advice('优化新成员创建任务的操作流程', '需要通过访谈和可用性测试找出操作中的问题。', ['tutorial-d1', 'tutorial-r2'], [], ['tutorial-source'])],
+  hypotheses: [advice('负责人和普通成员是否有不同的操作习惯？', '现有资料未说明，可向面试官确认。', ['tutorial-r2'], [], ['tutorial-source'])],
+  questions: [advice('目前用什么方式判断创建任务的流程是否好用？', '了解团队怎样做用户研究、如何评估改进效果。', ['tutorial-r2'], [], ['tutorial-source'])],
 };
 const recommendations: RecommendationResult = { recommendations: [{
   projectId: project.id, rank: 1, role: 'primary', matchType: 'transferable', requirementIds: ['tutorial-r1', 'tutorial-r2'], factIds: ['tutorial-f1', 'tutorial-f2'],
-  reason: '报名与创建协作任务都涉及入口发现、流程理解和表单操作，研究与验证方法可以迁移。',
-  resumeBullets: [{ text: '围绕校园活动报名中的入口与表单理解问题，开展用户访谈、梳理任务流程，并通过交互原型测试形成改进建议。', factIds: ['tutorial-f1', 'tutorial-f2'] }],
-  interviewOutline: [{ text: '先说明用户遇到的问题，再展示如何从访谈定位障碍、提出原型并测试；最后解释这些方法如何用于协作产品的新成员体验。', factIds: ['tutorial-f1', 'tutorial-f2'] }],
+  reason: '这个项目也关注入口位置和操作流程，使用了岗位要求的访谈、原型设计和可用性测试。',
+  resumeBullets: [{ text: '访谈报名同学，梳理活动报名流程，设计并测试交互原型，提出入口和表单说明的改进建议。', factIds: ['tutorial-f1', 'tutorial-f2'] }],
+  interviewOutline: [{ text: '说明报名时遇到的问题、访谈发现、方案选择和测试结果，再谈如何改进新成员创建任务的流程。', factIds: ['tutorial-f1', 'tutorial-f2'] }],
 }], gaps: [], needsReview: [] };
 const preparation: PreparationResult = {
-  priorities: [advice('准备一个从发现问题到验证方案的设计案例', '岗位同时看重流程表达、设计取舍与方案验证。', ['tutorial-r1', 'tutorial-r2'])],
-  strengths: [advice('用报名流程项目说明研究如何支持设计决策', '保留课程项目的背景，重点讲本人做过的研究与原型工作。', ['tutorial-r2'], ['tutorial-f1', 'tutorial-f2'])],
-  gaps: [advice('补充一次“为什么选择这个方案”的取舍说明', '把备选方案、约束和验证方式讲清楚。')],
-  companyResearch: [advice('梳理新成员创建任务时最容易困惑的环节', '结合公司业务场景，准备具体问题和验证思路。', ['tutorial-d1'], [], ['tutorial-source'])],
+  priorities: [advice('准备报名流程项目的完整介绍', '按发现问题、选择方案、验证结果的顺序讲清楚。', ['tutorial-r1', 'tutorial-r2'])],
+  strengths: [advice('介绍访谈发现如何影响报名流程的设计', '讲清楚你负责的访谈、原型设计和测试工作。', ['tutorial-r2'], ['tutorial-f1', 'tutorial-f2'])],
+  gaps: [advice('补充一个方案选择的例子', '说明备选方案、选择理由，以及用什么方式验证。')],
+  companyResearch: [advice('准备几个关于创建任务流程的问题', '面试时了解现有流程、常见问题和改进目标。', ['tutorial-d1'], [], ['tutorial-source'])],
 };
 const tasks: Task[] = [
   { id: 'tutorial-task-1', text: '整理报名流程项目的访谈、原型和测试材料', jobIds: [job.id], done: false, order: 0, createdAt: date },

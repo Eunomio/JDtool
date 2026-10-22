@@ -34,7 +34,7 @@ async function backup(page: Page) {
 
 test('首次自动展示与跨浏览器记录保留，首页可重开，手机蒙版与键盘可用', async ({ page, browser }) => {
   const name = username(); await signIn(page, name);
-  await expect(card(page).getByRole('heading', { name: '先用案例看懂准备流程' })).toBeVisible();
+  await expect(card(page).getByRole('heading', { name: '从添加岗位开始' })).toBeVisible();
   for (let count = 0; count < 8; count++) {
     await page.keyboard.press('Tab');
     expect(await page.evaluate(() => !!document.activeElement?.closest('.tutorial-card, [data-tour="add-jd"]'))).toBe(true);
@@ -52,9 +52,9 @@ test('首次自动展示与跨浏览器记录保留，首页可重开，手机�
       expect(await remote.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     }
     await remote.getByRole('button', { name: '新增JD', exact: true }).click();
-    await expect(card(remote).getByRole('heading', { name: '选一种方式提供JD' })).toBeVisible();
+    await expect(card(remote).getByRole('heading', { name: '导入岗位信息' })).toBeVisible();
     await card(remote).getByRole('button', { name: '上一步', exact: true }).click();
-    await expect(card(remote).getByRole('heading', { name: '先用案例看懂准备流程' })).toBeVisible();
+    await expect(card(remote).getByRole('heading', { name: '从添加岗位开始' })).toBeVisible();
     await card(remote).getByRole('button', { name: '跳过教程', exact: true }).click(); await expect(caseView(remote)).toHaveCount(0);
   } finally { await other.close(); }
 });
@@ -64,7 +64,7 @@ test('空账号无需填写或生成就能浏览全部案例，账号缓存和�
   const generated: string[] = [];
   for (const path of ['jobs/parse', 'jobs/classify', 'company/research', 'assist', 'project-recommendations', 'sources/extract', 'documents/read']) await page.route(`**/api/${path}`, route => { generated.push(path); return route.fulfill({ status: 503, json: { error: { message: '教程不应调用此服务。' } } }); });
   await signIn(page, username()); const before = await state(page, 'workspace');
-  await expect(caseView(page)).toContainText('岗位、公司与项目均为虚构案例');
+  await expect(caseView(page)).toContainText('以下为虚构示例，不会保存到你的账号');
   for (const step of ['input', 'review', 'requirements', 'category', 'company', 'projects', 'match', 'preparation', 'practice', 'plan']) {
     await card(page).locator('.tutorial-card-actions > .primary').click();
     await expect(page.locator('.tutorial-layer')).toHaveAttribute('data-step', step);
@@ -83,15 +83,15 @@ test('空账号无需填写或生成就能浏览全部案例，账号缓存和�
 
 test('案例中的采用、加入计划和完成只在本次教程生效，重开会清除', async ({ page }) => {
   await signIn(page, username()); await advanceTo(page, 'match');
-  await card(page).getByRole('button', { name: '自由查看案例', exact: true }).click();
+  await card(page).getByRole('button', { name: '收起引导', exact: true }).click();
   await caseView(page).getByRole('checkbox', { name: '已核对，采用这条表述' }).check();
   await page.getByRole('complementary', { name: '新手教程进度' }).getByRole('button', { name: '下一步', exact: true }).click();
-  await card(page).getByRole('button', { name: '自由查看案例', exact: true }).click();
+  await card(page).getByRole('button', { name: '收起引导', exact: true }).click();
   await caseView(page).getByRole('button', { name: '加入我的计划', exact: true }).first().click();
   await expect(caseView(page).getByRole('button', { name: '已加入计划', exact: true })).toBeVisible();
   await page.getByRole('complementary', { name: '新手教程进度' }).getByRole('button', { name: '下一步', exact: true }).click();
   await card(page).getByRole('button', { name: '下一步', exact: true }).click();
-  await card(page).getByRole('button', { name: '自由查看案例', exact: true }).click();
+  await card(page).getByRole('button', { name: '收起引导', exact: true }).click();
   const plan = caseView(page).locator('[data-tour="weekly-plan"]'); await expect(plan.getByRole('checkbox')).toHaveCount(3);
   await plan.getByRole('checkbox').first().check(); await expect(plan.locator('.count')).toHaveText('1 / 3');
   await page.keyboard.press('Escape'); await expect(caseView(page)).toHaveCount(0);
@@ -103,7 +103,7 @@ test('案例中的采用、加入计划和完成只在本次教程生效，重�
 });
 
 test('随时改用自己的JD，保存的是本人岗位，已有资料不被案例覆盖', async ({ page }) => {
-  await signIn(page, username()); await card(page).getByRole('button', { name: '用自己的JD试一试', exact: true }).click();
+  await signIn(page, username()); await card(page).getByRole('button', { name: '使用自己的JD', exact: true }).click();
   await expect(caseView(page)).toHaveCount(0); await expect(page.getByLabel('招聘页面链接')).toHaveValue('');
   await page.getByRole('tab', { name: '粘贴正文', exact: true }).click(); await page.getByLabel('岗位正文', { exact: true }).fill('负责产品需求分析、跨团队协作与迭代安排。');
   await page.getByRole('button', { name: '手动整理为草稿', exact: true }).click(); await page.getByLabel('岗位名称', { exact: true }).fill('我的产品经理岗位');
