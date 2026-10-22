@@ -1,6 +1,10 @@
-import type { Job } from './database';
+import type { Job, PracticeFeedback } from './database';
 
 export type Exercise = { id: string; direction: string; background: string; question: string; dimensions: string[]; followupDirections: string[]; nodes: { title: string; situation: string; colleague: string; choices: string[]; change: string }[] };
+export type PracticeExample = {
+  exercise: Exercise; answer: string; supplement: string; followup: string; feedback: PracticeFeedback; scenarioFeedback: PracticeFeedback;
+  colleagueReply: string; responses: { dialogue: string; consequence: string }[];
+};
 
 export function exerciseFor(job: Job): Exercise {
   const research = /人因|人机|研究|实验|测量/.test(`${job.title} ${job.direction}`);

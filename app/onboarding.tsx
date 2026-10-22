@@ -14,8 +14,10 @@ export const tutorialSteps = [
   { id: 'projects', target: 'project-import', title: '整理项目经历', text: '上传简历、添加作品集链接，或手动新增项目。核对本人角色、做过的工作和结果后，可用于岗位匹配。', next: '下一步' },
   { id: 'match', target: 'project-builder', title: '选择匹配的项目', text: '根据JD推荐相关项目，并整理简历要点和面试提纲。核对内容后，勾选采用即可复制。', next: '下一步' },
   { id: 'preparation', target: 'preparation-card', title: '查看准备建议', text: '准备卡列出岗位重点、可用经历和待补内容。点击“加入我的计划”，记下要做的事。', next: '下一步' },
-  { id: 'practice', target: 'practice-launch', title: '试试面试和岗位体验', text: '模拟面试可练习回答和追问，岗位体验可尝试处理工作任务。练习结束后，查看复盘和改进建议。', next: '下一步' },
-  { id: 'plan', target: 'weekly-plan', title: '管理准备计划', text: '加入计划的事项会显示在“本周准备”，完成后勾选即可。教程已结束，可以添加自己的JD开始准备。', next: '添加我的JD' },
+  { id: 'practice', target: 'practice-launch', title: '选择练习方式', text: '点击“模拟面试”练习回答，或点击“体验岗位一天”尝试处理工作任务。', next: '下一步' },
+  { id: 'interview', target: 'interview-practice', title: '试试模拟面试', text: '提交回答后会收到一次追问，补充回答后可查看复盘。示例已填好，也可直接点击“下一步”。', next: '下一步' },
+  { id: 'scenario', target: 'scenario-practice', title: '体验岗位工作', text: '向同事了解情况，选择或填写处理方案，再查看工作反馈。完成两项任务后可查看复盘。', next: '下一步' },
+  { id: 'plan', target: 'weekly-plan', title: '管理准备计划', text: '加入计划的事项会显示在“本周准备”，完成后勾选即可。点击“完成教程”返回首页。', next: '完成教程' },
 ] as const;
 export type TutorialStep = typeof tutorialSteps[number]['id'];
 
@@ -44,14 +46,14 @@ export function useOnboarding(accountId: string, ready: boolean, onStart: () => 
   const go = useCallback((next: TutorialStep) => { setPaused(false); setStep(next); }, []);
   const start = () => { begin(); void updateTutorial(accountId, 'start').catch(() => {}); };
   const close = (action: 'skip' | 'complete') => { handled.current = true; setStep(null); setPaused(false); void updateTutorial(accountId, action).catch(() => {}); };
-  return { step, paused, run, start, go, pause: () => setPaused(true), resume: () => setPaused(false), skip: () => close('skip'), complete: () => close('complete') };
+  return { step, paused, run, start, go, pause: () => { setPaused(true); window.scrollTo({ top: 0 }); }, resume: () => setPaused(false), skip: () => close('skip'), complete: () => close('complete') };
 }
 
 type Bounds = { left: number; top: number; width: number; height: number; viewWidth: number; viewHeight: number };
 const focusable = 'button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary, [tabindex="0"]';
 
-export default function Onboarding({ step, paused, onNext, onBack, onPause, onResume, onSkip, onRecover, onOwnJob, onReturnHome }: {
-  step: TutorialStep; paused: boolean; onNext: () => void; onBack?: () => void; onPause: () => void; onResume: () => void; onSkip: () => void; onRecover: () => void; onOwnJob: () => void; onReturnHome: () => void;
+export default function Onboarding({ step, paused, onNext, onBack, onPause, onResume, onSkip, onRecover }: {
+  step: TutorialStep; paused: boolean; onNext: () => void; onBack?: () => void; onPause: () => void; onResume: () => void; onSkip: () => void; onRecover: () => void;
 }) {
   const index = tutorialSteps.findIndex(item => item.id === step);
   const current = tutorialSteps[index];
@@ -144,7 +146,7 @@ export default function Onboarding({ step, paused, onNext, onBack, onPause, onRe
       <h2 id="tutorial-title">{current.title}</h2><p id="tutorial-description">{current.text}</p>
       {!bounds && <p className="tutorial-target-missing">请返回当前步骤后继续。</p>}
       <div className="tutorial-card-actions">{onBack && <button className="secondary" onClick={onBack}>上一步</button>}<button className="primary" onClick={bounds ? onNext : onRecover}>{bounds ? current.next : '返回这一步'}<Icon name="arrow" size={15} /></button></div>
-      <div className="tutorial-card-footer"><button className="tutorial-skip" onClick={step === 'plan' ? onReturnHome : onSkip}>{step === 'plan' ? '返回首页' : '跳过教程'}</button><button className="tutorial-skip" onClick={onOwnJob}>使用自己的JD</button>{step !== 'add' && <button className="tutorial-skip" onClick={onPause}>收起引导</button>}</div>
+      <div className="tutorial-card-footer">{step !== 'plan' && <button className="tutorial-skip" onClick={onSkip}>跳过教程</button>}{step !== 'add' && <button className="tutorial-skip" onClick={onPause}>收起引导</button>}</div>
     </div>
   </div>, document.body);
 }

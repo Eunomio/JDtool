@@ -17,14 +17,15 @@ function fromJob(job: Job): Draft {
     sourceUrl: job.sourceUrl || '', sourceType: job.sourceType || 'text', parsedAt: job.parsedAt, classification: job.classification };
 }
 
-export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen, onStageChange }: {
+export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen, onStageChange, example }: {
   ready: boolean; editing: Job | null; onSaved: (job: Job) => Promise<void>; onCancel: () => void; onOpen: (job: Job) => void; onStageChange?: (stage: 'input' | 'review') => void;
+  example?: { job: Job; stage: 'input' | 'review' };
 }) {
   const [mode, setMode] = useState<Mode>(editing?.sourceType || (editing ? 'text' : 'link'));
-  const [url, setUrl] = useState(editing?.sourceUrl || '');
-  const [text, setText] = useState(editing?.content || '');
-  const [images, setImages] = useState<UploadImage[]>(editing?.images || []);
-  const [draft, setDraft] = useState<Draft | null>(editing ? fromJob(editing) : null);
+  const [url, setUrl] = useState(editing?.sourceUrl || example?.job.sourceUrl || '');
+  const [text, setText] = useState(editing?.content || example?.job.content || '');
+  const [images, setImages] = useState<UploadImage[]>(editing?.images || example?.job.images || []);
+  const [draft, setDraft] = useState<Draft | null>(editing ? fromJob(editing) : example?.stage === 'review' ? fromJob(example.job) : null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState('');
@@ -32,7 +33,9 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
   const [allowDuplicate, setAllowDuplicate] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const reviewing = !!draft;
-  useEffect(() => { onStageChange?.(reviewing ? 'review' : 'input'); }, [reviewing, onStageChange]);
+  useEffect(() => { if (!example) onStageChange?.(reviewing ? 'review' : 'input'); }, [reviewing, onStageChange, example]);
+  useEffect(() => { if (example) setDraft(current => example.stage === 'review' ? current || fromJob(example.job) : null); }, [example?.stage]);
+  function showDraft(next: Draft | null) { setDraft(next); if (example) onStageChange?.(next ? 'review' : 'input'); }
 
   async function addImages(files: File[]) {
     setError('');
@@ -45,6 +48,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
     event.preventDefault();
     if (busy) return;
     setError('');
+    if (example) { showDraft({ ...fromJob(example.job), sourceType: mode, sourceUrl: url }); return; }
     if (mode === 'link' && !allowDuplicate) {
       const existing = (await database.jobs.toArray()).find((job) => job.id !== editing?.id && job.sourceUrl === url.trim());
       if (existing) { setDuplicate(existing); return; }
@@ -72,7 +76,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
       const now = new Date().toISOString();
       const fields = new FormData(event.currentTarget);
       const entries = (key: 'responsibilities' | 'requirements') => String(fields.get(key) || '').split('\n').map((value) => value.trim()).filter(Boolean).map((value, index) => ({
-        id: editing?.[key]?.[index]?.id || crypto.randomUUID(), text: value,
+        id: editing?.[key]?.[index]?.id || example?.job[key]?.find(item => item.text === value)?.id || crypto.randomUUID(), text: value,
         sourceText: draft[key].find((item) => item.text === value)?.sourceText || '',
       }));
       const job: Job = {
@@ -87,6 +91,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
       };
       job.classification = draft.classification?.inputVersion === roleInputVersion(job) ? draft.classification : undefined;
       job.categoryOverride = (String(fields.get('categoryOverride') || '') || undefined) as Job['categoryOverride'];
+      if (example) { await onSaved({ ...job, id: example.job.id }); return; }
       await database.jobs.put(job);
       setDraft(null); setImages([]); setUrl(''); setText(''); setDuplicate(null); setAllowDuplicate(false);
       await onSaved(job);
@@ -96,7 +101,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
 
   if (draft) return <section data-tour="jd-review" className="panel import-panel">
     <div className="import-steps" aria-label="添加岗位进度"><span className="done"><Icon name="check" size={13} />提供岗位</span><span aria-current="step"><b>2</b>核对内容</span><span><b>3</b>开始准备</span></div>
-    <div className="section-heading"><div><h2>{editing ? '编辑岗位' : '识别完成，请核对后保存'}</h2></div><div><button className="text-button" disabled={busy} onClick={() => setDraft(null)}>重新解析原始资料</button><button className="text-button" disabled={busy} onClick={() => { if (editing) onCancel(); else setDraft(null); }}>{editing ? '取消编辑' : '返回输入'}</button></div></div>
+    <div className="section-heading"><div><h2>{editing ? '编辑岗位' : '识别完成，请核对后保存'}</h2></div><div><button className="text-button" disabled={busy} onClick={() => showDraft(null)}>重新解析原始资料</button><button className="text-button" disabled={busy} onClick={() => { if (editing) onCancel(); else showDraft(null); }}>{editing ? '取消编辑' : '返回输入'}</button></div></div>
     {error && <p role="alert" className="notice error">{error}</p>}
     {draft.warnings.length > 0 && <div className="notice">{draft.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
     <form onSubmit={save} className="review-layout"><div className="source-preview"><h3>原始资料</h3>{draft.sourceType === 'images' && images.map((image, index) => <img className="source-image" key={index} src={image.dataUrl} alt={`原始JD截图${index + 1}`} />)}<label>岗位原文<textarea name="rawText" rows={18} required defaultValue={draft.rawText} maxLength={60000} /></label></div>
@@ -125,7 +130,7 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
       {mode === 'images' && <label>补充文字（选填）<textarea rows={3} value={text} onChange={(event) => setText(event.target.value)} placeholder="截图中被截断或不清楚的内容，可在这里补充" disabled={busy} /></label>}
       {mode === 'text' && <label>岗位正文<textarea name="text" required rows={8} maxLength={45000} value={text} onChange={(event) => setText(event.target.value)} placeholder="粘贴岗位名称、公司、职责与任职要求" disabled={busy} /></label>}
       <p className="privacy-note">点击解析后，所选文字或截图将用于本次识别，结果保存前可逐项核对。</p>
-      <div className="actions"><button className="primary" type="submit" disabled={busy || !ready || (mode === 'images' && !images.length)}>{busy ? '解析中…' : mode === 'link' ? '读取并解析' : mode === 'images' ? '识别并解析截图' : '解析正文'}</button>{mode === 'text' && <button type="button" className="secondary" disabled={busy || !text.trim()} onClick={() => setDraft({ isJobPosting: true, rawText: text, title: '', company: '', location: '', direction: '', hiringType: '', responsibilities: [], requirements: [], warnings: ['请补充岗位字段，保存后可继续编辑。'], sourceUrl: url, sourceType: 'text' })}>手动整理为草稿</button>}</div>
+      <div className="actions"><button className="primary" type="submit" disabled={busy || !ready || (mode === 'images' && !images.length)}>{busy ? '解析中…' : mode === 'link' ? '读取并解析' : mode === 'images' ? '识别并解析截图' : '解析正文'}</button>{mode === 'text' && <button type="button" className="secondary" disabled={busy || !text.trim()} onClick={() => showDraft({ isJobPosting: true, rawText: text, title: '', company: '', location: '', direction: '', hiringType: '', responsibilities: [], requirements: [], warnings: ['请补充岗位字段，保存后可继续编辑。'], sourceUrl: url, sourceType: 'text' })}>手动整理为草稿</button>}</div>
       {busy && <p className="progress-message" role="status">{stage}</p>}
     </form>
   </section>;

@@ -106,10 +106,17 @@ test('自动归类失败后可直接重试并保存，无需应用建议', async
 
 test('历史数据库中的校园招聘自动统一，手动编辑保存也使用校招', async ({ page }) => {
   await seed(page, true);
+  await expect(page.locator('.account-save')).toHaveAttribute('data-state', 'saved');
   await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>(resolve => { const opening = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`); opening.onsuccess = () => resolve(opening.result); });
     try { await new Promise<void>(resolve => { const tx = db.transaction('jobs', 'readwrite'); const table = tx.objectStore('jobs'); const request = table.get('ux-a'); request.onsuccess = () => table.put({ ...request.result, hiringType: '校园招聘' }); tx.oncomplete = () => resolve(); }); } finally { db.close(); }
   });
+  // Let the simulated legacy edit finish syncing before starting a fresh app bootstrap.
+  await expect.poll(() => page.evaluate(async () => {
+    const response = await fetch('/api/workspace', { headers: { 'X-Account-Id': localStorage.getItem('jdtool-active-account')! } });
+    return (await response.json()).data.jobs.find((job: { id: string }) => job.id === 'ux-a')?.hiringType;
+  })).toBe('校园招聘');
+  await expect(page.locator('.account-save')).toHaveAttribute('data-state', 'saved');
   await page.reload(); await page.getByRole('button', { name: '岗位清单', exact: true }).click(); await expect(page.getByRole('button', { name: '体验6个示例岗位' })).toBeEnabled();
   expect((await saved(page)).every(job => job.hiringType === '校招')).toBe(true);
   expect((await saved(page)).every(job => job.updatedAt === now)).toBe(true);
