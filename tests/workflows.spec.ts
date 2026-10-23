@@ -11,7 +11,7 @@ test('简历文字提取、事实确认、编辑与刷新恢复', async ({ page 
     await route.fulfill({ json: { projects: [{ name: '需求分析研究', type: '工作项目', stage: '已测试', timeline: '', role: '需求分析', problem: '', actions: '访谈并整理需求', methods: '访谈', results: '产出需求清单', skills: ['访谈'], facts: [{ text: '访谈并整理需求，产出需求清单', sourceText: '访谈并整理需求，产出需求清单', category: 'action' }], suggestedRedactions: [] }] } });
   });
   await page.goto('/'); await page.getByRole('button', { name: '我的项目', exact: true }).click();
-  await page.getByLabel('简历或项目文字').fill('需求分析研究：访谈并整理需求，产出需求清单');
+  await page.getByLabel('简历或项目文字', { exact: true }).fill('需求分析研究：访谈并整理需求，产出需求清单');
   await page.getByRole('button', { name: '解析为项目事实', exact: true }).click();
   await page.getByRole('button', { name: '核对并新增', exact: true }).click();
   await page.getByRole('checkbox', { name: '我已核对本人角色、项目阶段、事实与结果' }).check();
@@ -20,9 +20,10 @@ test('简历文字提取、事实确认、编辑与刷新恢复', async ({ page 
   await page.reload(); await page.getByRole('button', { name: '我的项目', exact: true }).click();
   await expect(page.getByText('事实已确认', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: '编辑与核对' }).click();
-  await expect(page.getByLabel('事实条目')).toHaveValue('访谈并整理需求，产出需求清单');
+  await expect(page.getByLabel('事实条目', { exact: true })).toHaveValue('访谈并整理需求，产出需求清单');
   await page.getByRole('button', { name: '取消', exact: true }).click();
-  await page.getByLabel('简历或项目文字').fill('需求分析研究：访谈并整理需求，产出需求清单');
+  await page.locator('.project-import-card > summary').click();
+  await page.getByLabel('简历或项目文字', { exact: true }).fill('需求分析研究：访谈并整理需求，产出需求清单');
   await page.getByRole('button', { name: '解析为项目事实', exact: true }).click();
   await page.getByRole('button', { name: '核对并合并', exact: true }).click();
   await page.getByRole('checkbox', { name: '我已核对本人角色、项目阶段、事实与结果' }).check();
@@ -76,10 +77,10 @@ test('面试一次追问、复盘保存与两决策剧情', async ({ page }) => 
   });
   await seedJobs(page); await navigate(page, '模拟面试');
   await page.getByLabel('选择目标岗位').selectOption('sample-iflytek-pm');
-  await page.getByLabel('我的回答').fill('核对数据口径并分析用户分群。');
+  await page.getByLabel('我的回答', { exact: true }).fill('核对数据口径并分析用户分群。');
   await page.getByRole('button', { name: '提交回答，获得追问' }).click();
   await expect(page.getByText('你会如何验证改进的效果？', { exact: true })).toBeVisible();
-  await page.getByLabel('补充回答').fill('先小范围验证任务完成率。'); await page.getByRole('button', { name: '提交补充，查看复盘' }).click();
+  await page.getByLabel('补充回答', { exact: true }).fill('先小范围验证任务完成率。'); await page.getByRole('button', { name: '提交补充，查看复盘' }).click();
   await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
   await navigate(page, '岗位体验');
   await page.getByRole('radio').first().check(); await page.getByRole('button', { name: '提交行动', exact: true }).click();

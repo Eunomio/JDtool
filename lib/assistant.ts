@@ -4,6 +4,7 @@ import { modelJson } from './model';
 import { workplaceStyle } from './scenario-style';
 import { splitDialogue } from './dialogue';
 import { companyGuidance } from './company-guidance';
+import { practiceSources } from './practice-context';
 
 const ids = z.array(z.string().max(200)).max(100);
 const short = z.string().max(4000);
@@ -26,6 +27,8 @@ const feedback = z.object({ strengths: z.array(short).max(10), dimensions: z.arr
 const interviewOutput = z.object({ followup: z.string(), feedback: feedback.nullable() });
 const scenarioOutput = z.object({ dialogue: short, consequence: short, feedback: feedback.nullable() });
 const exerciseOutput = z.object({ id: z.string(), direction: z.string(), background: short, question: short, dimensions: z.array(z.string()).min(3).max(8), followupDirections: z.array(z.string()).max(8), nodes: z.array(z.object({ title: z.string(), situation: short, colleague: z.string(), choices: z.array(z.string()).min(2).max(3), change: short })).length(2) });
+const interviewExerciseOutput = exerciseOutput.omit({ nodes: true });
+const scenarioExerciseOutput = exerciseOutput.omit({ question: true, followupDirections: true });
 
 const referenceItem = z.object({ id: z.string().max(200), text: z.string().max(8000), sourceText: z.string().max(8000).optional() });
 const jobInput = z.object({ id: z.string(), title: z.string(), company: z.string(), content: z.string().max(60000), direction: z.string().optional(), requirements: z.array(referenceItem).max(40).optional(), responsibilities: z.array(referenceItem).max(40).optional() });
@@ -61,7 +64,8 @@ async function generate<T extends z.ZodType>(schema: T, prompt: string, input: A
   const jsonSchema = z.toJSONSchema(schema) as Record<string, unknown>;
   delete jsonSchema.$schema;
   const style = input.action === 'exercise' || input.action === 'scenario' ? `\n${workplaceStyle}${input.stage === 'dialogue' ? '\n本轮只回复用户向同事提出的问题，未提供的信息不要编造。consequence为空，feedback=null，不推进任务。' : input.stage === 'review' ? '\n复盘基于用户实际选择与提问，不评价性格，不把练习写成用户实际完成的工作。' : ''}` : '';
-  const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, 6000, false));
+  const limit = input.action === 'exercise' ? input.mode === 'interview' ? 2200 : input.mode === 'scenario' ? 3800 : 6000 : input.action === 'interview' && input.stage === 'followup' ? 1000 : input.action === 'scenario' && input.stage !== 'review' ? 1400 : 6000;
+  const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, limit, false));
   if (!result.success) throw new AppError(502, 'INVALID_RESULT', '本次结果未完整生成，请重试。');
   const data = pruneReferences(result.data, input);
   if (input.action === 'exercise' && data && typeof data === 'object' && 'nodes' in data && Array.isArray(data.nodes)) {
@@ -72,6 +76,7 @@ async function generate<T extends z.ZodType>(schema: T, prompt: string, input: A
 }
 
 export async function assist(input: AssistInput) {
+  if (['exercise', 'interview', 'scenario'].includes(input.action) && input.job) input = { ...input, sources: practiceSources(input.job, input.sources || [], input.action === 'exercise' ? 8000 : 5000) };
   if (input.action === 'interview' && (input.stage !== 'followup' && input.stage !== 'review')) throw new AppError(400, 'INVALID_STAGE', '请先回答题目，再完成追问与复盘。');
   if (input.action === 'interview' && input.stage === 'review' && (!input.followup?.trim() || !input.answer?.trim() || !input.supplement?.trim())) throw new AppError(400, 'MISSING_FOLLOWUP', '请完成题目与追问的回答后再查看复盘。');
   for (const job of [input.job, ...(input.jobs || [])]) {
@@ -86,7 +91,16 @@ export async function assist(input: AssistInput) {
   }
   if (input.action === 'exercise') {
     if (!input.job) throw new AppError(400, 'MISSING_JOB', '请先选择目标岗位。');
-    return generate(exerciseOutput, '根据当前JD明确职责和公司公开资料，制作一份简洁的岗位工作练习。缺少内部业务资料时，可以设置一个不指名真实品牌的假设产品或研究对象，以及少量明确的练习数据，让用户处理具体问题；这些设定仅用于练习，不称为该公司真实业务。禁止以“资料仅包含JD”“无真实用户数据”“通用方法论”“构建通用框架”等元说明代替工作任务。背景与题干都必须具体到待处理的问题。表达样式参考（只参考写法，内容按当前岗位调整）：“练习任务：一款企业协作工具收到导出慢和入口难找的反馈。本轮只能安排一项改动，请整理问题清单、优先级和验证计划。” background在130字内写出问题、现有资料、资源限制和交付物，开头用“练习任务：”，无需反复声明公司或产品未指定。question是一道与JD对应的实际岗位面试题。nodes恰好两个先后任务，每个title是工作动作，colleague只填一个职能称呼，situation用同事直接发来的工作消息表达，在130字内说清需要用户处理的事。change仅填写本轮已知的“资源限制：”或“交付要求：”，不能插入突发事件、领导施压、竞品突然发布、项目被叫停等推动剧情的内容。不得使用“此时发现”“突然”“高层要求”“市场反响热烈”等叙事表达。第二项任务延续同一问题，不以“若用户选A则...”编排分支，也不能否定或强行覆盖用户先前的合理选择。每项2—3个都有现实价值、取舍不同的推进方式，每个选项80字内，不用明显错误选项凑数。练习中的假设数据只需最少几项，放在任务材料里，不表述为公司事实。公司资料不明时围绕JD职责，不擅自指定真实产品线。dimensions和followupDirections用于岗位面试复盘。', input);
+    if (input.mode === 'interview') {
+      const data = await generate(interviewExerciseOutput, '只准备当前岗位的一道面试题和背景，不生成工作任务。question为一道与JD职责直接对应的现实面试题，60字左右，允许明确的问题条件；background用80字以内交代题目需要的业务场景和约束，避免重复题目。dimensions列3—5项能力，followupDirections列2—3个可能追问方向。根据所给公司来源理解业务，来源可能是与JD相关的摘录，不能把未出现的内容认定为不存在；未指定产品线时不默认归属。允许少量明确为练习条件的假设，不伪称公司事实。返回id、direction、background、question、dimensions、followupDirections。', input);
+      return { ...data, nodes: [] };
+    }
+    const prompt = '根据当前JD明确职责和公司公开资料，制作一份简洁的岗位工作练习。缺少内部业务资料时，可以设置一个不指名真实品牌的假设产品或研究对象，以及少量明确的练习数据，让用户处理具体问题；这些设定仅用于练习，不称为该公司真实业务。禁止以“资料仅包含JD”“无真实用户数据”“通用方法论”“构建通用框架”等元说明代替工作任务。背景与题干都必须具体到待处理的问题。表达样式参考（只参考写法，内容按当前岗位调整）：“练习任务：一款企业协作工具收到导出慢和入口难找的反馈。本轮只能安排一项改动，请整理问题清单、优先级和验证计划。” background在130字内写出问题、现有资料、资源限制和交付物，开头用“练习任务：”，无需反复声明公司或产品未指定。question是一道与JD对应的实际岗位面试题。nodes恰好两个先后任务，每个title是工作动作，colleague只填一个职能称呼，situation用同事直接发来的工作消息表达，在130字内说清需要用户处理的事。change仅填写本轮已知的“资源限制：”或“交付要求：”，不能插入突发事件、领导施压、竞品突然发布、项目被叫停等推动剧情的内容。不得使用“此时发现”“突然”“高层要求”“市场反响热烈”等叙事表达。第二项任务延续同一问题，不以“若用户选A则...”编排分支，也不能否定或强行覆盖用户先前的合理选择。每项2—3个都有现实价值、取舍不同的推进方式，每个选项80字内，不用明显错误选项凑数。练习中的假设数据只需最少几项，放在任务材料里，不表述为公司事实。公司资料不明时围绕JD职责，不擅自指定真实产品线。dimensions和followupDirections用于岗位面试复盘。';
+    if (input.mode === 'scenario') {
+      const data = await generate(scenarioExerciseOutput, prompt.replace('question是一道与JD对应的实际岗位面试题。', '本轮只生成两项工作任务，不生成面试题和追问方向。') + '公司资料可能为与JD相关的摘录，只能依据已给出的内容判断。', input);
+      return { ...data, question: '', followupDirections: [] };
+    }
+    return generate(exerciseOutput, prompt, input);
   }
   if (['recommendations', 'preparation', 'company', 'interview', 'scenario'].includes(input.action) && !input.job) throw new AppError(400, 'MISSING_JOB', '请先选择目标岗位。');
   if (input.action === 'recommendations') {

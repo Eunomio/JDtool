@@ -1,4 +1,5 @@
 'use client';
+import VoiceTextarea from './voice-textarea';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { database, accountRequestHeaders, type Job } from '../lib/database';
@@ -6,6 +7,7 @@ import { prepareImage, type UploadImage } from '../lib/image-upload';
 import type { ParsedJob } from '../lib/job-parser';
 import { normalizeHiringType } from '../lib/job-normalization';
 import { Icon } from './ui';
+import { AsyncStatus } from './async-status';
 import { roleCategories, roleInputVersion } from '../lib/role-taxonomy';
 
 type Mode = 'link' | 'images' | 'text';
@@ -104,11 +106,11 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
     <div className="section-heading"><div><h2>{editing ? '编辑岗位' : '识别完成，请核对后保存'}</h2></div><div><button className="text-button" disabled={busy} onClick={() => showDraft(null)}>重新解析原始资料</button><button className="text-button" disabled={busy} onClick={() => { if (editing) onCancel(); else showDraft(null); }}>{editing ? '取消编辑' : '返回输入'}</button></div></div>
     {error && <p role="alert" className="notice error">{error}</p>}
     {draft.warnings.length > 0 && <div className="notice">{draft.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
-    <form onSubmit={save} className="review-layout"><div className="source-preview"><h3>原始资料</h3>{draft.sourceType === 'images' && images.map((image, index) => <img className="source-image" key={index} src={image.dataUrl} alt={`原始JD截图${index + 1}`} />)}<label>岗位原文<textarea name="rawText" rows={18} required defaultValue={draft.rawText} maxLength={60000} /></label></div>
+    <form onSubmit={save} className="review-layout"><div className="source-preview"><h3>原始资料</h3>{draft.sourceType === 'images' && images.map((image, index) => <img className="source-image" key={index} src={image.dataUrl} alt={`原始JD截图${index + 1}`} />)}<label>岗位原文<VoiceTextarea name="rawText" rows={18} required defaultValue={draft.rawText} maxLength={60000} /></label></div>
       <div className="review-fields"><label>岗位名称<input name="title" defaultValue={draft.title} maxLength={200} placeholder="未识别到，可补充或保存为草稿" /></label><label>公司名称<input name="company" defaultValue={draft.company} maxLength={200} /></label><div className="field-pair"><label>地点<input name="location" defaultValue={draft.location} maxLength={300} /></label><label>招聘类型<input name="hiringType" defaultValue={draft.hiringType} maxLength={200} /></label></div>
       <div className="classification-result"><span className="icon-tile"><Icon name="layers" /></span><div><h3>{draft.classification ? roleCategories.find(category => category.id === draft.classification?.categoryId)?.name : '保存后可继续分析职位类别'}</h3>{draft.classification?.reason && <p>{draft.classification.reason}</p>}{draft.classification?.evidence.slice(0, 2).map(quote => <blockquote key={quote}>{quote}</blockquote>)}</div></div>
       <details><summary>手动调整类别（选填）</summary><label>职位大类<select name="categoryOverride" defaultValue={editing?.categoryOverride || ''}><option value="">使用JD分析结果</option>{roleCategories.map(category => <option key={category.id} value={category.id}>{category.family} · {category.name}</option>)}</select></label></details>
-      <label>岗位方向<input name="direction" defaultValue={draft.direction} maxLength={200} placeholder="保留JD中的细分方向，选填" /></label><label>岗位职责<textarea name="responsibilities" rows={5} defaultValue={draft.responsibilities.map((item) => item.text).join('\n')} /></label><label>任职要求<textarea name="requirements" rows={5} defaultValue={draft.requirements.map((item) => item.text).join('\n')} /></label><label>来源链接<input name="sourceUrl" type="url" defaultValue={draft.sourceUrl} /></label>
+      <label>岗位方向<input name="direction" defaultValue={draft.direction} maxLength={200} placeholder="保留JD中的细分方向，选填" /></label><label>岗位职责<VoiceTextarea name="responsibilities" rows={5} defaultValue={draft.responsibilities.map((item) => item.text).join('\n')} /></label><label>任职要求<VoiceTextarea name="requirements" rows={5} defaultValue={draft.requirements.map((item) => item.text).join('\n')} /></label><label>来源链接<input name="sourceUrl" type="url" defaultValue={draft.sourceUrl} /></label>
       <details><summary>查看逐条原文依据</summary>{[...draft.responsibilities, ...draft.requirements].map((item, index) => <blockquote key={index}><strong>{item.text}</strong><p>{item.sourceText}</p></blockquote>)}</details>
       <div className="sticky-actions"><button className="primary" disabled={busy || !ready} type="submit">{busy ? '保存中…' : '保存岗位'}</button></div></div>
     </form>
@@ -127,11 +129,11 @@ export default function JobImporter({ ready, editing, onSaved, onCancel, onOpen,
         <button type="button" className="secondary" onClick={() => inputRef.current?.click()} disabled={busy}>选择JD截图</button><p className="muted">也可拖入或在此粘贴截图；PNG、JPG、WebP，最多3张。</p>
         <div className="image-grid">{images.map((image, index) => <div key={`${image.name}-${index}`} className="image-item"><img src={image.dataUrl} alt={`JD截图${index + 1}`} /><span>{index + 1}. {image.name}</span><div><button type="button" className="text-button" disabled={busy || index === 0} onClick={() => setImages((current) => { const next = [...current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>前移</button><button type="button" className="text-button" disabled={busy} onClick={() => setImages((current) => current.filter((_item, itemIndex) => itemIndex !== index))}>移除</button></div></div>)}</div>
       </div>}
-      {mode === 'images' && <label>补充文字（选填）<textarea rows={3} value={text} onChange={(event) => setText(event.target.value)} placeholder="截图中被截断或不清楚的内容，可在这里补充" disabled={busy} /></label>}
-      {mode === 'text' && <label>岗位正文<textarea name="text" required rows={8} maxLength={45000} value={text} onChange={(event) => setText(event.target.value)} placeholder="粘贴岗位名称、公司、职责与任职要求" disabled={busy} /></label>}
+      {mode === 'images' && <label>补充文字（选填）<VoiceTextarea rows={3} value={text} onChange={(event) => setText(event.target.value)} placeholder="截图中被截断或不清楚的内容，可在这里补充" disabled={busy} /></label>}
+      {mode === 'text' && <label>岗位正文<VoiceTextarea name="text" required rows={8} maxLength={45000} value={text} onChange={(event) => setText(event.target.value)} placeholder="粘贴岗位名称、公司、职责与任职要求" disabled={busy} /></label>}
       <p className="privacy-note">点击解析后，所选文字或截图将用于本次识别，结果保存前可逐项核对。</p>
       <div className="actions"><button className="primary" type="submit" disabled={busy || !ready || (mode === 'images' && !images.length)}>{busy ? '解析中…' : mode === 'link' ? '读取并解析' : mode === 'images' ? '识别并解析截图' : '解析正文'}</button>{mode === 'text' && <button type="button" className="secondary" disabled={busy || !text.trim()} onClick={() => showDraft({ isJobPosting: true, rawText: text, title: '', company: '', location: '', direction: '', hiringType: '', responsibilities: [], requirements: [], warnings: ['请补充岗位字段，保存后可继续编辑。'], sourceUrl: url, sourceType: 'text' })}>手动整理为草稿</button>}</div>
-      {busy && <p className="progress-message" role="status">{stage}</p>}
+      {busy && <AsyncStatus label={stage || '正在整理岗位内容'} />}
     </form>
   </section>;
 }

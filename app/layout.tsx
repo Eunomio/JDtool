@@ -5,6 +5,7 @@ import './account.css';
 import './responsive.css';
 import './onboarding.css';
 import './readability.css';
+import './flow.css';
 
 export const metadata: Metadata = {
   title: '岗位探索与求职准备助手',

@@ -19,7 +19,7 @@ const preparation = z.object({ priorities: z.array(advice), strengths: z.array(a
 const company = z.object({ facts: z.array(advice), hypotheses: z.array(advice), questions: z.array(advice), businesses: z.array(advice).optional(), roleInsights: z.array(advice).optional(), research: z.object({ company: text, summary: text, identityNote: text, queries: z.array(text), searchedAt: date }).optional() });
 const comparison = z.object({ common: z.array(advice), differences: z.array(z.object({ jobId: id, uniqueRequirements: z.array(advice), projects: z.array(advice), preparation: z.array(advice) })), reusable: z.array(advice) });
 const feedback = z.object({ strengths: z.array(text), dimensions: z.array(z.object({ name: text, feedback: text, requirementIds: ids })), improvements: z.array(text), outline: z.array(text), nextActions: z.array(text) });
-const exercise = z.object({ id, direction: text, background: text, question: text, dimensions: z.array(text), followupDirections: z.array(text), nodes: z.array(z.object({ title: text, situation: text, colleague: text, choices: z.array(text).min(2), change: text })).length(2) });
+const exercise = z.object({ id, direction: text, background: text, question: text, dimensions: z.array(text), followupDirections: z.array(text), nodes: z.array(z.object({ title: text, situation: text, colleague: text, choices: z.array(text).min(2), change: text })).refine(nodes => nodes.length === 0 || nodes.length === 2, '练习任务数量无效') });
 const saved = { id, jobId: id, inputVersion: text, projectVersions: z.array(z.object({ id, updatedAt: date })).optional(), createdAt: date };
 const job = z.object({
   id, title: text, company: text, content: text, sourceUrl: url.optional(), sourceType: z.enum(['link', 'images', 'text']).optional(),
@@ -51,6 +51,7 @@ export function parseBackup(value: unknown): Backup {
   const result = backupSchema.safeParse(value);
   if (!result.success) throw new Error('备份中的资料格式有误，现有资料未被修改。请选择完整备份。');
   const data = result.data;
+  if (data.practice.some(record => record.type === 'scenario' && record.data.exercise && record.data.exercise.nodes.length !== 2)) throw new Error('备份中的岗位体验任务不完整，现有资料未被修改。');
   for (const table of tables) if (!unique(data[table].map((record) => record.id))) throw new Error('备份包含重复的记录编号，现有资料未被修改。');
   if (!unique(data.projects.flatMap((project) => project.facts.map((fact) => fact.id))) || !unique(data.jobs.flatMap((job) => [...(job.requirements || []), ...(job.responsibilities || [])].map((item) => item.id)))) throw new Error('备份中的事实编号有重复，现有资料未被修改。');
   return data;

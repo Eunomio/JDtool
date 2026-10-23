@@ -11,3 +11,8 @@
 !scripts/
 !scripts/prepare-standalone.mjs
 !scripts/prepare-assets.mjs
+!scripts/asr-worker.cjs
+!scripts/prepare-asr.mjs
+!scripts/check-deploy-size.mjs
+!public/
+!public/voice-recorder.js

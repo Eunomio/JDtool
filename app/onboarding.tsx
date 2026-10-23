@@ -13,7 +13,7 @@ export const tutorialSteps = [
   { id: 'company', target: 'company-research', title: '了解公司业务', text: '切换“公司与业务”“岗位与业务”等页签，分别查看业务、准备建议和面试问题。展开建议下方的依据可查看来源。', next: '下一步' },
   { id: 'projects', target: 'project-import', title: '整理项目经历', text: '上传简历、添加作品集链接，或手动新增项目。核对本人角色、做过的工作和结果后，可用于岗位匹配。', next: '下一步' },
   { id: 'match', target: 'project-builder', focus: '.builder-columns', title: '选择匹配的项目', text: '根据JD推荐相关项目，并整理简历要点和面试提纲。核对内容后，勾选采用即可复制。', next: '下一步' },
-  { id: 'preparation', target: 'preparation-card', focus: '.preparation-grid', title: '查看准备建议', text: '准备卡列出岗位重点、可用经历和待补内容。点击“加入我的计划”，记下要做的事。', next: '下一步' },
+  { id: 'preparation', target: 'preparation-card', focus: '.preparation-content', title: '查看准备建议', text: '准备卡列出岗位重点、可用经历和待补内容。点击“加入我的计划”，记下要做的事。', next: '下一步' },
   { id: 'practice', target: 'practice-launch', title: '选择练习方式', text: '点击“模拟面试”练习回答，或点击“体验岗位一天”尝试处理工作任务。', next: '下一步' },
   { id: 'interview', target: 'interview-practice', focus: '.page-stack', title: '试试模拟面试', text: '提交回答后会收到一次追问，补充回答后可查看复盘。示例已填好，也可直接点击“下一步”。', next: '下一步' },
   { id: 'scenario', target: 'scenario-practice', focus: '.work-task, .page-stack', title: '体验岗位工作', text: '向同事了解情况，选择或填写处理方案，再查看工作反馈。完成两项任务后可查看复盘。', next: '下一步' },

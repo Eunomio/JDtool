@@ -11,6 +11,7 @@
     "start": "node scripts/start.mjs",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
+    "prepare:asr": "node scripts/prepare-asr.mjs",
     "modelscope:probe": "node scripts/modelscope.mjs probe"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "playwright": "^1.64.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "sherpa-onnx-node": "1.13.8",
     "undici": "^8.12.3",
     "zod": "^4.6.7"
   },

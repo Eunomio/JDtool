@@ -8,7 +8,7 @@ test('DOCX简历读取后可核对原文', async ({ page }) => {
   zip.file('word/document.xml', '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>需求研究项目：本人开展用户访谈并整理需求清单，产出软件原型。</w:t></w:r></w:p></w:body></w:document>');
   await page.goto('/'); await page.getByRole('button', { name: '我的项目', exact: true }).click();
   await page.getByLabel('上传简历').setInputFiles({ name: 'resume.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: await zip.generateAsync({ type: 'nodebuffer' }) });
-  await expect(page.getByLabel('简历或项目文字')).toHaveValue(/本人开展用户访谈并整理需求清单/);
+  await expect(page.getByLabel('简历或项目文字', { exact: true })).toHaveValue(/本人开展用户访谈并整理需求清单/);
 });
 
 test('文字PDF简历可读取', async ({ page, context }) => {
@@ -17,7 +17,7 @@ test('文字PDF简历可读取', async ({ page, context }) => {
   const document = await fixture.pdf(); await fixture.close();
   await page.goto('/'); await page.getByRole('button', { name: '我的项目', exact: true }).click();
   await page.getByLabel('上传简历').setInputFiles({ name: 'resume.pdf', mimeType: 'application/pdf', buffer: document });
-  await expect(page.getByLabel('简历或项目文字')).toHaveValue(/Product research project/);
+  await expect(page.getByLabel('简历或项目文字', { exact: true })).toHaveValue(/Product research project/);
 });
 
 test('扫描PDF走文字识别并显示待核对文字', async ({ page, context }) => {
@@ -29,5 +29,5 @@ test('扫描PDF走文字识别并显示待核对文字', async ({ page, context 
   await page.route('**/api/documents/read', (route) => route.fulfill({ json: { text: '扫描简历识别：本人设计实验并分析眼动数据。' } }));
   await page.goto('/'); await page.getByRole('button', { name: '我的项目', exact: true }).click();
   await page.getByLabel('上传简历').setInputFiles({ name: 'scan.pdf', mimeType: 'application/pdf', buffer: document });
-  await expect(page.getByLabel('简历或项目文字')).toHaveValue(/扫描简历识别/);
+  await expect(page.getByLabel('简历或项目文字', { exact: true })).toHaveValue(/扫描简历识别/);
 });

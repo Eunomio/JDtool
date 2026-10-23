@@ -4,7 +4,7 @@ test('保存、刷新、修改状态、编辑与删除撤销', async ({ page }) 
   await page.goto('/');
   await page.getByRole('button', { name: '新增JD', exact: true }).click();
   await page.getByRole('tab', { name: '粘贴正文' }).click();
-  await page.getByLabel('岗位正文').fill('分析用户需求，协同技术与运营推进产品改进。');
+  await page.getByLabel('岗位正文', { exact: true }).fill('分析用户需求，协同技术与运营推进产品改进。');
   await page.getByRole('button', { name: '手动整理为草稿' }).click();
   await page.getByLabel('岗位名称').fill('产品经理');
   await page.getByLabel('公司名称').fill('测试公司');

@@ -1,0 +1,65 @@
+import { test, expect, navigate, type Page } from './fixtures';
+
+const now = '2026-10-23T08:00:00.000Z';
+const jobs = ['甲', '乙'].map((name, index) => ({ id: `flow-job-${index}`, title: `产品经理${name}`, company: `测试公司${name}`, content: '负责产品需求分析与研发协作。', requirements: [{ id: `flow-r${index}`, text: '分析用户需求', sourceText: '分析用户需求' }], responsibilities: [], status: '关注中', nextAction: '', createdAt: now, updatedAt: now }));
+const advice = (text: string) => ({ text, reason: '对应需求分析职责', requirementIds: ['flow-r0'], factIds: [], sourceIds: [] });
+const feedback = { strengths: ['能说明问题边界'], improvements: ['补充验证周期'], dimensions: [{ name: '需求判断', feedback: '需要说明证据', requirementIds: ['flow-r0'] }], outline: ['先核对问题'], nextActions: ['再整理一份验证计划'] };
+const exercise = { id: 'flow-exercise', direction: '产品经理', background: '处理产品需求', question: '如何判断优先级？', dimensions: ['需求', '协作', '验证'], followupDirections: ['证据'], nodes: [] };
+async function seed(page: Page, extras: Record<string, unknown> = {}) {
+  await page.goto('/'); await expect(page.getByRole('button', { name: '体验6个示例岗位' })).toBeEnabled();
+  await page.getByText('资料备份', { exact: true }).click(); page.once('dialog', dialog => dialog.accept());
+  await page.getByLabel('选择备份文件', { exact: true }).setInputFiles({ name: 'flow.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'jdtool-backup', version: 2, jobs, ...extras })) });
+  await expect(page.getByText('备份已恢复。', { exact: true })).toBeVisible(); await page.getByText('资料备份', { exact: true }).click();
+}
+
+test('首页集中回看待办、各岗位准备卡和练习复盘，分区切换与筛选可继续实际准备', async ({ page }) => {
+  await seed(page, {
+    tasks: jobs.map((job, index) => ({ id: `flow-task${index}`, text: `整理岗位${index}的需求案例`, jobIds: [job.id], done: false, order: index, createdAt: now })),
+    preparations: jobs.map(job => ({ id: `flow-card-${job.id}`, jobId: job.id, inputVersion: 'old', createdAt: now, data: { priorities: [advice('先整理需求依据')], strengths: [advice('可以讲述调研过程')], gaps: [advice('补充验证方法')], companyResearch: [advice('了解产品对象')] } })),
+    practice: [{ id: `interview-${jobs[0].id}`, jobId: jobs[0].id, type: 'interview', inputVersion: 'old', updatedAt: now, data: { exercise, answer: '核对需求', followup: '如何验证？', supplement: '观察完成率', feedback, node: 0, moves: [], choice: '', question: '', response: null } }],
+  });
+  await page.getByRole('button', { name: '返回首页', exact: true }).click();
+  const hub = page.locator('.home-hub'); await expect(hub.locator('.hub-task')).toHaveCount(2);
+  await hub.getByRole('checkbox').first().click(); await expect(hub.locator('.hub-task')).toHaveCount(1);
+  await hub.getByLabel('待办状态', { exact: true }).selectOption('done'); await expect(hub.getByRole('checkbox')).toBeChecked();
+  await hub.getByLabel('关联岗位', { exact: true }).selectOption(jobs[0].id);
+  await hub.getByRole('tab', { name: '岗位准备卡', exact: true }).click(); await expect(hub.locator('.hub-saved-card:visible')).toHaveCount(1);
+  await hub.getByRole('button', { name: '查看准备卡', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '岗位准备卡', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '我能讲什么', exact: true }).click(); await expect(page.getByText('可以讲述调研过程', { exact: true })).toBeVisible(); await expect(page.getByText('先整理需求依据', { exact: true })).toBeHidden();
+  await expect(page.locator('.preparation-content > [role=tabpanel]:visible')).toHaveCount(1);
+  await page.getByRole('button', { name: '返回首页', exact: true }).click(); await page.getByRole('tab', { name: '练习复盘', exact: true }).click(); await page.getByRole('button', { name: '回看复盘', exact: true }).click();
+  await expect(page.locator('.interview-device')).toBeVisible(); await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '下一步练习', exact: true }).click(); await page.getByRole('button', { name: '加入我的计划', exact: true }).click();
+  await page.getByRole('button', { name: '返回首页', exact: true }).click(); await expect(page.locator('.hub-task').filter({ hasText: '再整理一份验证计划' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('项目为空时展开导入，保存项目后收起，刷新和重开仍优先显示已有项目', async ({ page }) => {
+  await page.goto('/'); await navigate(page, '我的项目'); const form = page.locator('.project-import-card');
+  await expect(form).toHaveAttribute('open', ''); await page.getByRole('button', { name: '使用脱敏示例项目', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '专业桌面软件升级项目', exact: true })).toBeVisible(); await expect(form).not.toHaveAttribute('open', '');
+  await page.reload(); await navigate(page, '我的项目'); await expect(form).not.toHaveAttribute('open', '');
+  await form.locator('summary').first().click(); await expect(page.getByRole('textbox', { name: '简历或项目文字', exact: true })).toBeVisible();
+});
+
+test('比较结果按三块显示，切换无需重新生成，选中按钮与背景有明显区别', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/api/assist', async route => { calls++; const input = route.request().postDataJSON(); await route.fulfill({ json: { common: [advice('共同的分析方法')], differences: input.jobs.map((job: { id: string }) => ({ jobId: job.id, uniqueRequirements: [advice('这个岗位的具体差异')], projects: [], preparation: [advice('单独准备的知识')] })), reusable: [advice('可以复用的项目材料')] } }); });
+  await seed(page); await navigate(page, '岗位比较'); await page.getByRole('checkbox').first().check(); await page.getByRole('checkbox').nth(1).check(); await page.getByRole('button', { name: '比较所选岗位', exact: true }).click();
+  const result = page.locator('.comparison-results'); await expect(result.getByText('共同的分析方法', { exact: true })).toBeVisible();
+  await result.getByRole('tab', { name: '岗位对比', exact: true }).click(); await expect(result.getByText('共同的分析方法', { exact: true })).toBeHidden(); await expect(result.getByText('这个岗位的具体差异', { exact: true })).toHaveCount(2);
+  const colors = await result.getByRole('tab', { name: '岗位对比', exact: true }).evaluate(node => [getComputedStyle(node).backgroundColor, getComputedStyle(node.parentElement!).backgroundColor]); expect(colors[0]).not.toBe(colors[1]);
+  await result.getByRole('tab', { name: '岗位对比', exact: true }).press('End'); await expect(result.getByText('可以复用的项目材料', { exact: true })).toBeVisible();
+  await expect(result.locator(':scope > [role=tabpanel]:visible')).toHaveCount(1); expect(calls).toBe(1);
+});
+
+test('面试只请求当前模式，等待有动画和计时，停止后可重试并复用保存的题目', async ({ page }) => {
+  let calls = 0; let release!: () => void; const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/assist', async route => { calls++; expect(route.request().postDataJSON().mode).toBe('interview'); if (calls === 1) await pending; await route.fulfill({ json: exercise }).catch(() => {}); });
+  await seed(page); await navigate(page, '模拟面试');
+  const indicator = page.locator('.request-indicator'); await expect(indicator).toBeVisible(); await expect(page.locator('.practice-skeleton')).toBeVisible(); await expect(indicator.locator('.async-spinner')).toBeVisible();
+  await expect(indicator.locator('.async-elapsed')).toContainText(/秒/); await indicator.getByRole('button', { name: '停止', exact: true }).click(); release();
+  await expect(page.locator('.practice').getByRole('alert')).toContainText('已停止'); await page.getByRole('button', { name: '重新准备题目', exact: true }).click(); await expect(page.getByRole('textbox', { name: '我的回答', exact: true })).toBeVisible();
+  await navigate(page, '岗位清单'); await navigate(page, '模拟面试'); await expect(page.getByRole('textbox', { name: '我的回答', exact: true })).toBeVisible(); expect(calls).toBe(2);
+});

@@ -45,7 +45,7 @@ test('链接失败后保留链接并继续使用正文', async ({ page }) => {
   await page.getByRole('button', { name: '读取并解析' }).click();
   await expect(page.getByRole('alert').filter({ hasText: '网页需要登录' })).toBeVisible();
   await page.getByRole('button', { name: '粘贴正文', exact: true }).click();
-  await page.getByLabel('岗位正文').fill(text);
+  await page.getByLabel('岗位正文', { exact: true }).fill(text);
   await page.getByRole('button', { name: '手动整理为草稿' }).click();
   await expect(page.getByLabel('来源链接')).toHaveValue('https://example.com/login');
 });

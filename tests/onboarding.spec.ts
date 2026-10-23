@@ -243,6 +243,7 @@ test('原版面试与岗位体验可在教程中操作，含追问、两项任�
   await expect(view.getByText('面试官追问', { exact: true })).toBeVisible();
   await view.getByRole('button', { name: '提交补充，查看复盘', exact: true }).click();
   await expect(view.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
+  await view.getByRole('tab', { name: '下一步练习', exact: true }).click();
   await view.getByRole('button', { name: '设为下一步行动', exact: true }).click();
   page.once('dialog', dialog => dialog.accept()); await view.getByRole('button', { name: '重新开始', exact: true }).click();
   await expect(view.getByRole('textbox', { name: '我的回答', exact: true })).toBeVisible();
@@ -261,6 +262,7 @@ test('原版面试与岗位体验可在教程中操作，含追问、两项任�
   await view.getByRole('radio').first().check(); await view.getByRole('button', { name: '提交行动', exact: true }).click();
   await view.getByRole('button', { name: '查看任务复盘', exact: true }).click();
   await expect(view.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
+  await view.getByRole('tab', { name: '下一步练习', exact: true }).click();
   await view.getByRole('button', { name: '加入我的计划', exact: true }).click();
   await page.getByRole('complementary', { name: '新手教程进度' }).getByRole('button', { name: '下一步', exact: true }).click();
   await expect(view.locator('[data-tour="weekly-plan"] .count')).toHaveText('0 / 3');
