@@ -70,15 +70,20 @@ test('项目为空时展开导入，保存项目后收起，刷新和重开仍�
   await form.locator('summary').first().click(); await expect(page.getByRole('textbox', { name: '简历或项目文字', exact: true })).toBeVisible();
 });
 
-test('比较结果按三块显示，切换无需重新生成，选中按钮与背景有明显区别', async ({ page }) => {
+test('比较完成后只显示结果，回到顶部，重开保留选择，刷新直接回看结果', async ({ page }) => {
   let calls = 0;
   await page.route('**/api/assist', async route => { calls++; const input = route.request().postDataJSON(); await route.fulfill({ json: { common: [advice('共同的分析方法')], differences: input.jobs.map((job: { id: string }) => ({ jobId: job.id, uniqueRequirements: [advice('这个岗位的具体差异')], projects: [], preparation: [advice('单独准备的知识')] })), reusable: [advice('可以复用的项目材料')] } }); });
-  await seed(page); await navigate(page, '岗位比较'); await page.getByRole('checkbox').first().check(); await page.getByRole('checkbox').nth(1).check(); await page.getByRole('button', { name: '比较所选岗位', exact: true }).click();
+  await seed(page, { jobs: [...jobs, ...Array.from({ length: 8 }, (_, index) => ({ ...jobs[0], id: `other-${index}`, title: `其他岗位${index}`, requirements: [] }))] }); await navigate(page, '岗位比较'); await page.getByRole('checkbox', { name: /测试公司甲 · 产品经理甲/ }).check(); await page.getByRole('checkbox', { name: /测试公司乙 · 产品经理乙/ }).check(); await page.getByRole('button', { name: '比较所选岗位', exact: true }).click();
   const result = page.locator('.comparison-results'); await expect(result.getByText('共同的分析方法', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '比较所选岗位', exact: true })).toHaveCount(0); await expect(page.getByRole('checkbox')).toHaveCount(0);
+  const heading = page.getByRole('heading', { name: '比较结果', exact: true }); await expect(heading).toBeFocused(); expect((await heading.boundingBox())!.y).toBeLessThan(200); expect(await page.evaluate(() => scrollY)).toBe(0);
   await result.getByRole('tab', { name: '岗位对比', exact: true }).click(); await expect(result.getByText('共同的分析方法', { exact: true })).toBeHidden(); await expect(result.getByText('这个岗位的具体差异', { exact: true })).toHaveCount(2);
   const colors = await result.getByRole('tab', { name: '岗位对比', exact: true }).evaluate(node => [getComputedStyle(node).backgroundColor, getComputedStyle(node.parentElement!).backgroundColor]); expect(colors[0]).not.toBe(colors[1]);
   await result.getByRole('tab', { name: '岗位对比', exact: true }).press('End'); await expect(result.getByText('可以复用的项目材料', { exact: true })).toBeVisible();
   await expect(result.locator(':scope > [role=tabpanel]:visible')).toHaveCount(1); expect(calls).toBe(1);
+  await page.reload(); await expect(result).toBeVisible(); await expect(page.locator('.comparison-setup')).toHaveCount(0); expect(calls).toBe(1);
+  await page.getByRole('button', { name: '重新比较', exact: true }).click(); await expect(result).toHaveCount(0); await expect(page.locator('.comparison-setup')).toBeVisible(); await expect(page.locator('.comparison-setup input:checked')).toHaveCount(2); expect(await page.evaluate(() => scrollY)).toBe(0);
+  await page.getByRole('button', { name: '比较所选岗位', exact: true }).click(); await expect(result).toBeVisible(); expect(calls).toBe(2);
 });
 
 test('面试只请求当前模式，等待有动画和计时，停止后可重试并复用保存的题目', async ({ page }) => {

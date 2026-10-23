@@ -6,6 +6,18 @@
 .preparation-content { gap: 12px; }
 .preparation-content .advice-section, .comparison-results > [role=tabpanel] { max-width: 960px; }
 .comparison-results > [role=tabpanel] { margin-top: 24px; }
+.comparison-results > .section-heading { align-items: center; gap: 16px; }
+.comparison-results > .section-heading h1 { margin: 0; }
+.comparison-scope { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 24px; }
+.comparison-scope .tag { white-space: normal; overflow-wrap: anywhere; }
+.app-main .card-milestones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 18px 0; }
+.app-main .card-milestones > span { justify-content: flex-start; gap: 7px; padding-top: 8px; color: #536784; font-size: 14px; font-weight: 500; line-height: 1.7; }
+.app-main .card-milestones > span.done { color: #2452e8; font-weight: 600; }
+.app-main .card-milestones > span > span { width: 10px; height: 10px; border-color: #9caecb; flex-shrink: 0; }
+.app-main .card-milestones svg { width: 14px; height: 14px; flex-shrink: 0; }
+.app-main .journey-stop strong { font-size: 16px; line-height: 1.6; }
+.app-main .journey-stop em { font-size: 14px; line-height: 1.7; }
+@media (min-width: 768px) { .app-main .job-grid.as-list .card-milestones { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .project-import-card > summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; list-style: none; color: var(--ink); }
 .project-import-card > summary::-webkit-details-marker { display: none; }
 .project-import-toggle { padding: 8px 13px; border: 1px solid #b7caef; border-radius: 9px; background: #eff4ff; color: #2452e8; white-space: nowrap; font-size: 14px; }

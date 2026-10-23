@@ -62,6 +62,7 @@ test('相近与跨方向比较形成各岗位准备任务', async ({ page }) => 
   await page.getByRole('checkbox', { name: /vivo/ }).check(); await page.getByRole('checkbox', { name: /蔚来 · 人机工程师/ }).check();
   await page.getByRole('button', { name: '比较所选岗位' }).click();
   await expect(page.getByRole('heading', { name: '比较结果', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '重新比较', exact: true }).click();
   await page.getByRole('tab', { name: '跨方向比较' }).click();
   await page.getByRole('checkbox', { name: /蔚来 · 人机工程师/ }).uncheck(); await page.getByRole('checkbox', { name: /科大讯飞/ }).check();
   await page.getByRole('button', { name: '比较所选岗位' }).click();
