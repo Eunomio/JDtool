@@ -41,7 +41,7 @@ export type Project = {
   facts: ProjectFact[]; sources: Source[]; confirmed: boolean; sample?: boolean;
   visibility: 'private' | 'display'; redactions: { from: string; to: string }[]; updatedAt: string;
 };
-export type Advice = { text: string; reason: string; requirementIds: string[]; factIds: string[]; sourceIds: string[]; sourceQuotes?: { sourceId: string; quote: string }[] };
+export type Advice = { text: string; reason: string; example?: string; requirementIds: string[]; factIds: string[]; sourceIds: string[]; sourceQuotes?: { sourceId: string; quote: string }[] };
 export type GeneratedBullet = { text: string; factIds: string[]; adopted?: boolean };
 export type Recommendation = { projectId: string; rank: number; role: 'primary' | 'supporting'; matchType: 'direct' | 'transferable' | 'needs_more'; requirementIds: string[]; factIds: string[]; reason: string; resumeBullets: GeneratedBullet[]; interviewOutline: GeneratedBullet[] };
 export type RecommendationResult = { recommendations: Recommendation[]; gaps: Advice[]; needsReview: string[] };

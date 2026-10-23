@@ -3,6 +3,7 @@ import { AppError } from './errors';
 import { modelJson } from './model';
 import { workplaceStyle } from './scenario-style';
 import { splitDialogue } from './dialogue';
+import { companyGuidance } from './company-guidance';
 
 const ids = z.array(z.string().max(200)).max(100);
 const short = z.string().max(4000);
@@ -18,7 +19,8 @@ const projectOutput = z.object({ projects: z.array(z.object({
   suggestedRedactions: z.array(z.object({ from: z.string(), to: z.string() })).max(30),
 })).max(20) });
 const preparationOutput = z.object({ priorities: z.array(evidence).max(10), strengths: z.array(evidence).max(10), gaps: z.array(evidence).max(10), companyResearch: z.array(evidence).max(10) });
-const companyOutput = z.object({ facts: z.array(evidence).max(12), hypotheses: z.array(evidence).max(8), questions: z.array(evidence).max(8) });
+const companyEvidence = evidence.extend({ example: short.optional(), sourceQuotes: z.array(z.object({ sourceId: z.string(), quote: short })).max(5).optional() });
+const companyOutput = z.object({ facts: z.array(companyEvidence).max(12), businesses: z.array(companyEvidence).max(6).optional(), roleInsights: z.array(companyEvidence).max(6).optional(), hypotheses: z.array(companyEvidence).max(8), questions: z.array(companyEvidence).max(8) });
 const compareOutput = z.object({ common: z.array(evidence).max(12), differences: z.array(z.object({ jobId: z.string(), uniqueRequirements: z.array(evidence).max(10), projects: z.array(evidence).max(8), preparation: z.array(evidence).max(8) })).max(3), reusable: z.array(evidence).max(12) });
 const feedback = z.object({ strengths: z.array(short).max(10), dimensions: z.array(z.object({ name: z.string(), feedback: short, requirementIds: ids })).max(10), improvements: z.array(short).max(10), outline: z.array(short).max(15), nextActions: z.array(short).max(8) });
 const interviewOutput = z.object({ followup: z.string(), feedback: feedback.nullable() });
@@ -130,8 +132,15 @@ export async function assist(input: AssistInput) {
   }
   if (input.action === 'preparation') return generate(preparationOutput, '生成四栏岗位准备卡：priorities岗位看重什么、strengths我能讲什么、gaps还需补什么、companyResearch面试前了解什么。按优先级排序，每项写具体行动与理由，至少引用一项JD要求、项目事实或公司来源。缺失经历表述为需要补充；未上传简历时提供通用准备行动，不假设个人有经历。', input);
   if (input.action === 'company') {
-    const data = await generate(companyOutput, 'facts只列给定公司公开资料已确认且与岗位有关的信息，每条必须引用sourceIds；hypotheses只列可能相关业务方向，说明依据与不确定点；questions列面试中可确认的问题。JD未指定产品线时明确尚待确认，不自动指定公司某产品线。', input);
+    const data = await generate(companyOutput, `facts只列给定公司公开资料已确认且与岗位有关的信息，每条必须引用sourceIds；businesses列主要产品、服务对象与业务场景；roleInsights关联JD职责给出准备建议，同时引用requirementIds和sourceIds；hypotheses列待确认的业务方向，说明依据与不确定点；questions列面试中可确认的问题。每条举例都在sourceQuotes中逐字引用对应来源原句，覆盖例子中的具体数据。${companyGuidance}`, input);
     data.facts = data.facts.filter((item) => item.sourceIds.length);
+    data.businesses = data.businesses?.filter(item => item.sourceIds.length);
+    data.roleInsights = data.roleInsights?.filter(item => item.sourceIds.length && item.requirementIds.length);
+    const normalized = (value: string) => value.replace(/\s+/g, '');
+    for (const rows of [data.facts, data.businesses, data.roleInsights, data.hypotheses, data.questions]) for (const row of rows || []) {
+      row.sourceQuotes = row.sourceQuotes?.filter(quote => normalized(quote.quote).length >= 8 && row.sourceIds.includes(quote.sourceId) && input.sources?.some(source => source.id === quote.sourceId && normalized(source.text).includes(normalized(quote.quote))));
+      if (!row.sourceQuotes?.length) delete row.example;
+    }
     return data;
   }
   if (input.action === 'compare') {

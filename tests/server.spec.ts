@@ -158,6 +158,41 @@ test('Tavily请求只发送搜索词并对上游错误隐藏密钥和响应正�
   } finally { globalThis.fetch = originalFetch; for (const [name, value] of [['TAVILY_API_KEY', key], ['BOCHA_API_KEY', bocha]]) { if (value === undefined) delete process.env[name!]; else process.env[name!] = value; } }
 });
 
+test('硬件研究把参数放在有原文依据的举例中，自动与补充资料分析共用概括建议规则', async () => {
+  const restore = await isolateModel(); const originalFetch = globalThis.fetch;
+  const restoreSearch = setEnvironment({ SEARCH_PROVIDER: 'tavily', TAVILY_API_KEY: 'test-only-search' });
+  const now = new Date().toISOString();
+  const job = { id: 'hardware-job', company: '示例硬件公司', title: '硬件工程师', content: '负责可靠性测试与验证。', requirements: [{ id: 'r1', text: '可靠性测试与验证', sourceText: '负责可靠性测试与验证。' }] };
+  const text = '该产品公开测试范围为零下20度至60度，用于说明工作环境适应性。';
+  const source = { id: 'hardware-source', jobId: job.id, label: '公开产品测试说明', url: 'https://example.com/hardware', text, collectedAt: now };
+  const advice = { text: '梳理可靠性目标与验证思路', reason: '结合JD，准备说明验证条件的选择及不同目标之间的取舍。', example: '公开产品的零下20度至60度测试范围可帮助理解环境适应性，不代表当前岗位的考核要求。', requirementIds: ['r1'], factIds: [], sourceIds: [source.id], sourceQuotes: [{ sourceId: source.id, quote: text }] };
+  try {
+    globalThis.fetch = async (_url, options) => {
+      const request = JSON.parse(options!.body as string); const prompt = request.messages[0].content;
+      expect(prompt).toContain('建议先概括'); expect(prompt).toContain('不能推导为当前岗位'); expect(prompt).toContain('JD明确写出的指标应保留');
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ facts: [advice], businesses: [advice], roleInsights: [advice], hypotheses: [], questions: [{ ...advice, sourceQuotes: [{ sourceId: source.id, quote: '来源中不存在的测试数据' }] }] }) } }] });
+    };
+    const manual = await assist({ action: 'company', job, sources: [source] });
+    if (!('facts' in manual)) throw Error('Expected company analysis');
+    expect(manual.roleInsights?.[0].example).toBe(advice.example); expect(manual.questions[0].example).toBeUndefined();
+    let calls = 0;
+    const automatic = await researchCompany({ job }, () => {}, {
+      search: async () => [{ title: source.label, url: source.url, snippet: text }],
+      validate: async url => ({ url: new URL(url), addresses: [{ address: '93.184.216.34', family: 4 }] }),
+      read: async url => ({ status: 200, headers: { 'content-type': 'text/html' }, url, body: Buffer.from(`<html><body>${text.repeat(12)}</body></html>`) }),
+      json: async (prompt, content) => {
+        if (++calls === 1) return { keywords: ['官网 产品'] };
+        expect(prompt).toContain('建议先概括'); expect(prompt).toContain('不能推导为当前岗位');
+        const { sources } = JSON.parse(content as string); const row = { ...advice, sourceIds: [sources[0].id], quotes: [{ sourceId: sources[0].id, quote: text }] };
+        return { identityMatched: true, identityNote: '主体匹配', facts: [row], businesses: [row], roleInsights: [row], hypotheses: [], questions: [] };
+      },
+    });
+    expect(automatic.data.roleInsights![0].example).toBe(advice.example);
+    const parsed = parseBackup({ format: 'jdtool-backup', version: 2, jobs: [{ ...job, status: '关注中', nextAction: '', createdAt: now, updatedAt: now }], sources: automatic.sources, companies: [{ id: 'hardware-result', jobId: job.id, createdAt: now, inputVersion: 'hardware', data: automatic.data }] });
+    expect(parsed.companies[0].data.roleInsights![0].example).toBe(advice.example);
+  } finally { globalThis.fetch = originalFetch; restore(); restoreSearch(); }
+});
+
 test('岗位体验的真实调用提示包含工作沟通规范，提问不会提前推进任务', async () => {
   const restore = await isolateModel(); const originalFetch = globalThis.fetch;
   try {

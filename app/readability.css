@@ -1,0 +1,66 @@
+:root { --reading-size: 16px; --supporting-size: 14px; }
+body { font-size: var(--reading-size); line-height: 1.8; }
+h2 { font-size: 22px; line-height: 1.5; }
+h3 { font-size: 18px; line-height: 1.5; }
+.app-main p, .app-main li, .app-main blockquote, .app-main .source-text,
+.app-main input, .app-main textarea, .app-main select,
+.app-main .generated-project p, .app-main .builder-columns textarea,
+.app-main .colleague-message .colleague-bubble p, .app-main .my-action p, .app-main .work-impact p,
+.app-main .selection-card > span:last-child, .app-main .task-row label { font-size: var(--reading-size); line-height: 1.8; }
+.app-main .muted, .app-main .reference-label, .app-main .tag, .app-main .privacy-note,
+.app-main small, .app-main .source-domain, .app-main .source-domain span,
+.app-main .colleague-meta strong, .app-main .colleague-meta > span,
+.app-main .task-deliverable, .app-main .practice-flow > span, .app-main .scenario-label,
+.app-main .generated-bullet .inline, .app-main .tutorial-case-banner { font-size: var(--supporting-size); line-height: 1.7; }
+.app-main .muted, .app-main .reference-label, .app-main .privacy-note { color: #586983; }
+.app-main button, .app-main summary, .app-main label, .app-main legend { font-size: var(--supporting-size); }
+.app-main .section-heading h2, .app-main .job-requirements h2 { font-size: 22px; }
+.app-main .advice-section h3, .app-main .builder-columns > div > h3,
+.app-main .generated-project h4, .app-main .question-card h2 { font-size: 18px; }
+.app-main .advice-item { font-size: var(--reading-size); line-height: 1.8; }
+.app-main .advice-item > strong { display: block; font-size: 18px; font-weight: 650; color: #203a64; line-height: 1.65; }
+.app-main .advice-item p { color: #435673; margin: 12px 0; }
+.app-main .advice-item .evidence summary, .app-main .source-library > summary { font-size: var(--supporting-size); color: #345daa; }
+.app-main .evidence blockquote { padding: 16px 18px; line-height: 1.8; background: #f5f8ff; }
+.app-main .advice-example { padding: 14px 16px; border-radius: 10px; background: #eef3ff; }
+.app-main .source-card h3 { font-size: 18px; line-height: 1.65; }
+.app-main .requirement-list p, .app-main .skill-list p { color: #344d71; }
+.app-main .requirement-list li, .app-main .skill-list p { margin: 20px 0; }
+.app-main .job-content, .app-main .source-text { line-height: 1.85; }
+.app-main .workspace-tabs button { font-size: 15px; }
+.understanding-tabs.workspace-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px; border: 1px solid #dbe4f4; border-radius: 14px; background: #eaf0fb; }
+.understanding-tabs.workspace-tabs button { flex: 1 1 auto; min-height: 46px; padding: 10px 16px; border-radius: 9px; background: transparent; color: #4a6084; box-shadow: none; }
+.understanding-tabs.workspace-tabs button small { display: none; }
+.understanding-tabs.workspace-tabs button[aria-selected=true] { background: #2452e8; border-color: #2452e8; color: white; box-shadow: 0 3px 10px #2452e825; }
+.job-requirements .role-overview { gap: 32px; }
+.job-requirements .original-jd { margin-top: 28px; padding-top: 20px; }
+.company-research .section-heading { margin-bottom: 24px; }
+.company-research [role=tabpanel] { max-width: 900px; margin: 0 auto; }
+.company-research .research-summary { margin: 0 0 24px; padding: 20px 24px; }
+.company-research .research-summary > p { color: #344f7a; }
+.company-research .advice-section { display: grid; gap: 16px; }
+.company-research .advice-item { padding: 22px 24px; border: 1px solid #dfe7f5; border-radius: 14px; background: #fbfcff; }
+.company-research .advice-item > p { max-width: 72ch; }
+.company-research .advice-item .plan-action { display: block; margin-top: 16px; }
+.company-research .source-library { margin-top: 28px; }
+.app-main .research-steps > span, .app-main .research-steps b, .app-main .research-progress p { font-size: 14px; }
+.app-main .research-progress small { overflow-wrap: anywhere; }
+.app-main .candidate, .app-main .generated-project { margin-bottom: 24px; }
+.app-main .practice .task-brief p, .app-main .question-card p { max-width: 80ch; }
+.app-main .work-task { gap: 24px; }
+.app-main .practice .colleague-bubble, .app-main .selection-card { padding: 18px; }
+.app-main .practice .privacy-note { margin-top: 24px; }
+@media (max-width: 767px) {
+  .app-main .section-heading h2, .app-main .job-requirements h2 { font-size: 21px; }
+  .understanding-tabs.workspace-tabs { gap: 6px; }
+  .understanding-tabs.workspace-tabs button { flex: 1 1 calc(33.333% - 6px); min-height: 44px; padding: 10px 6px; font-size: 14px; white-space: nowrap; }
+  .understanding-tabs.workspace-tabs button span { flex-basis: auto; }
+  .company-research .advice-item { padding: 18px; }
+  .company-research .research-summary { padding: 18px; }
+  .job-requirements .role-overview { gap: 24px; }
+  .app-main .practice .colleague-bubble, .app-main .selection-card { padding: 15px; }
+  .app-main .advice-item > strong { font-size: 18px; }
+}
+@media (max-width: 359px) {
+  .company-research .advice-item { padding: 16px; }
+}

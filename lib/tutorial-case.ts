@@ -28,7 +28,7 @@ function advice(text: string, reason: string, requirementIds = ['tutorial-r1'], 
 const company: CompanyResult = {
   facts: [advice('为小型团队提供任务管理与项目协作工具', '理解目标用户是项目负责人和团队成员。', [], [], ['tutorial-source'])],
   businesses: [advice('提供任务分配和项目进度管理工具', '主要供小型团队的项目负责人和成员使用。', [], [], ['tutorial-source'])],
-  roleInsights: [advice('优化新成员创建任务的操作流程', '需要通过访谈和可用性测试找出操作中的问题。', ['tutorial-d1', 'tutorial-r2'], [], ['tutorial-source'])],
+  roleInsights: [{ ...advice('梳理用户流程与验证方法', '结合JD，准备说明如何通过访谈发现问题、选择交互方案，并验证操作是否顺畅。', ['tutorial-d1', 'tutorial-r2'], [], ['tutorial-source']), example: '案例中的任务管理工具希望改善新成员首次创建任务的体验，可以据此讨论入口、负责人字段和可用性测试。' }],
   hypotheses: [advice('负责人和普通成员是否有不同的操作习惯？', '现有资料未说明，可向面试官确认。', ['tutorial-r2'], [], ['tutorial-source'])],
   questions: [advice('目前用什么方式判断创建任务的流程是否好用？', '了解团队怎样做用户研究、如何评估改进效果。', ['tutorial-r2'], [], ['tutorial-source'])],
 };

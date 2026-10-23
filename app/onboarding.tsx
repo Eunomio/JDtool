@@ -10,7 +10,7 @@ export const tutorialSteps = [
   { id: 'review', target: 'jd-review', focus: '.review-fields', title: '核对岗位信息', text: '解析后可对照原文，检查岗位名称、公司、职责和要求。确认无误后，保存到岗位清单。', next: '下一步' },
   { id: 'requirements', target: 'jd-breakdown', title: '查看岗位要求', text: '职责和任职要求已分开整理。准备简历和面试时，可回到这里查看重点，也可展开完整JD。', next: '下一步' },
   { id: 'category', target: 'job-category', title: '自动归类岗位', text: '岗位按JD内容自动分类。“交互设计”“体验设计”等相近名称可以归为一类，也可在岗位详情中手动修改。', next: '下一步' },
-  { id: 'company', target: 'company-research', title: '了解公司业务', text: '自动搜索公司公开资料，整理主要业务及岗位相关信息。展开“查看依据”可查看来源。', next: '下一步' },
+  { id: 'company', target: 'company-research', title: '了解公司业务', text: '切换“公司与业务”“岗位与业务”等页签，分别查看业务、准备建议和面试问题。展开建议下方的依据可查看来源。', next: '下一步' },
   { id: 'projects', target: 'project-import', title: '整理项目经历', text: '上传简历、添加作品集链接，或手动新增项目。核对本人角色、做过的工作和结果后，可用于岗位匹配。', next: '下一步' },
   { id: 'match', target: 'project-builder', focus: '.builder-columns', title: '选择匹配的项目', text: '根据JD推荐相关项目，并整理简历要点和面试提纲。核对内容后，勾选采用即可复制。', next: '下一步' },
   { id: 'preparation', target: 'preparation-card', focus: '.preparation-grid', title: '查看准备建议', text: '准备卡列出岗位重点、可用经历和待补内容。点击“加入我的计划”，记下要做的事。', next: '下一步' },
