@@ -22,7 +22,7 @@ test('首页集中回看待办、各岗位准备卡和练习复盘，分区切�
   const hub = page.locator('.home-hub'); await expect(hub.locator('.hub-task')).toHaveCount(2);
   await hub.getByRole('checkbox').first().click(); await expect(hub.locator('.hub-task')).toHaveCount(1);
   await hub.getByLabel('待办状态', { exact: true }).selectOption('done'); await expect(hub.getByRole('checkbox')).toBeChecked();
-  await hub.getByLabel('关联岗位', { exact: true }).selectOption(jobs[0].id);
+  await hub.getByRole('combobox', { name: '关联岗位', exact: true }).click(); await hub.getByRole('option', { name: `${jobs[0].company} · ${jobs[0].title}`, exact: true }).click();
   await hub.getByRole('tab', { name: '岗位准备卡', exact: true }).click(); await expect(hub.locator('.hub-saved-card:visible')).toHaveCount(1);
   await hub.getByRole('button', { name: '查看准备卡', exact: true }).click();
   await expect(page.getByRole('heading', { name: '岗位准备卡', exact: true })).toBeVisible();
@@ -33,6 +33,33 @@ test('首页集中回看待办、各岗位准备卡和练习复盘，分区切�
   await page.getByRole('tab', { name: '下一步练习', exact: true }).click(); await page.getByRole('button', { name: '加入我的计划', exact: true }).click();
   await page.getByRole('button', { name: '返回首页', exact: true }).click(); await expect(page.locator('.hub-task').filter({ hasText: '再整理一份验证计划' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('首页长岗位名完整换行，筛选支持键盘和取消，移除按钮独立操作', async ({ page }) => {
+  const longJob = { ...jobs[0], company: '星桥智能出行与企业协作研究有限公司', title: '高级产品经理（智能座舱与跨端用户体验方向，面向校园招聘及有相关项目经验的候选人）' };
+  await seed(page, { jobs: [longJob, jobs[1]], tasks: [longJob, jobs[1]].map((job, index) => ({ id: `long-task${index}`, text: `整理岗位${index}的案例`, jobIds: [job.id], done: false, order: index, createdAt: now })) });
+  await page.getByRole('button', { name: '返回首页', exact: true }).click();
+  const hub = page.locator('.home-hub'); const filter = hub.getByRole('combobox', { name: '关联岗位', exact: true });
+  await filter.click(); await hub.getByRole('option', { name: `${longJob.company} · ${longJob.title}`, exact: true }).click();
+  await expect(hub.locator('.hub-task')).toHaveCount(1); await expect(filter).toContainText(longJob.title);
+  for (const width of [1440, 1024, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 }); await expect(filter).toBeVisible();
+    const task = hub.locator('.hub-task'); const remove = task.getByRole('button', { name: '移除', exact: true });
+    const linkBox = (await task.locator('.hub-job-link').boundingBox())!; const removeBox = (await remove.boundingBox())!;
+    expect(removeBox.width).toBeGreaterThanOrEqual(88); expect(removeBox.height).toBeGreaterThanOrEqual(44);
+    expect(width < 768 ? removeBox.y - (linkBox.y + linkBox.height) : removeBox.x - (linkBox.x + linkBox.width)).toBeGreaterThanOrEqual(10);
+    await filter.click(); const option = hub.getByRole('option', { name: `${longJob.company} · ${longJob.title}`, exact: true });
+    await expect(option).toBeFocused();
+    expect(await option.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await option.press('Escape'); await expect(filter).toBeFocused(); await expect(filter).toHaveAttribute('aria-expanded', 'false');
+    expect(await hub.locator('.hub-job-trigger, .hub-job-link').evaluateAll(nodes => nodes.every(node => node.scrollWidth <= node.clientWidth))).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await filter.press('ArrowDown'); await hub.getByRole('option', { name: `${longJob.company} · ${longJob.title}`, exact: true }).press('End');
+  await expect(hub.getByRole('listbox').getByRole('option').last()).toBeFocused(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+  await expect(hub.locator('.hub-task')).toHaveCount(1); await expect(hub.locator('.hub-task')).toContainText('整理岗位1的案例');
+  await filter.click(); await hub.getByRole('option', { name: '全部岗位', exact: true }).click(); await expect(hub.locator('.hub-task')).toHaveCount(2);
+  await hub.locator('.hub-task').filter({ hasText: '整理岗位0的案例' }).getByRole('button', { name: '移除', exact: true }).click(); await expect(hub.locator('.hub-task')).toHaveCount(1); await expect(hub.locator('.hub-task')).toContainText('整理岗位1的案例');
 });
 
 test('项目为空时展开导入，保存项目后收起，刷新和重开仍优先显示已有项目', async ({ page }) => {

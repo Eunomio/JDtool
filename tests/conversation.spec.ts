@@ -17,12 +17,12 @@ async function contact(page: Page, name: string) {
 test('面试通过左右消息推进，失败消息刷新后可修改重发，复盘和对话分别查看', async ({ page }) => {
   let followups = 0;
   await page.route('**/api/assist', async route => { const input = route.request().postDataJSON(); if (input.action === 'exercise') return route.fulfill({ json: { ...exercise, nodes: [] } }); if (input.stage === 'followup' && ++followups === 1) return route.fulfill({ status: 503, json: { error: { message: '暂时未收到回复。' } } }); return route.fulfill({ json: { followup: input.stage === 'followup' ? '你会怎样确认反馈具有代表性？' : '', feedback: input.stage === 'review' ? feedback : null } }); });
-  await seed(page); await navigate(page, '模拟面试'); await page.getByRole('textbox', { name: '我的回答', exact: true }).fill('先核对反馈来源。'); await page.getByRole('button', { name: '提交回答，获得追问', exact: true }).click();
+  await seed(page); await navigate(page, '模拟面试'); await expect(page.locator('.chat-question .chat-speaker')).toHaveText('面试官'); await expect(page.locator('.chat-question .chat-bubble')).toHaveText(exercise.question); await expect(page.locator('.conversation-context')).not.toContainText(exercise.question); await page.getByRole('textbox', { name: '我的回答', exact: true }).fill('先核对反馈来源。'); await page.getByRole('button', { name: '提交回答，获得追问', exact: true }).click();
   await expect(page.locator('.chat-own .chat-bubble')).toHaveText('先核对反馈来源。'); await expect(page.locator('main').getByRole('alert')).toContainText('暂时未收到回复');
   await page.reload(); await expect(page.getByRole('button', { name: '重试回复', exact: true })).toBeVisible(); expect(followups).toBe(1);
   await page.getByRole('button', { name: '修改消息', exact: true }).click(); const field = page.getByRole('textbox', { name: '我的回答', exact: true }); await expect(field).toHaveValue('先核对反馈来源。'); await field.fill('先核对反馈来源和覆盖范围。'); await field.press('Control+Enter');
-  await expect(page.locator('.chat-other .chat-bubble')).toContainText('你会怎样确认反馈具有代表性');
-  const own = await page.locator('.chat-own .chat-bubble').boundingBox(); const other = await page.locator('.chat-other .chat-bubble').boundingBox(); expect(own!.x + own!.width).toBeGreaterThan(other!.x + other!.width);
+  await expect(page.locator('.chat-other .chat-bubble').last()).toContainText('你会怎样确认反馈具有代表性');
+  const own = await page.locator('.chat-own .chat-bubble').boundingBox(); const other = await page.locator('.chat-other .chat-bubble').last().boundingBox(); expect(own!.x + own!.width).toBeGreaterThan(other!.x + other!.width);
   await page.getByRole('textbox', { name: '补充回答', exact: true }).fill('对照用户分群，并补充观察样本。'); await page.getByRole('button', { name: '提交补充，查看复盘', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看本轮复盘', exact: true })).toBeVisible(); await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '查看本轮复盘', exact: true }).click(); await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible(); await page.getByRole('button', { name: '返回对话', exact: true }).click(); await expect(page.locator('.chat-own')).toHaveCount(2);

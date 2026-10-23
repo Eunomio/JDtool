@@ -12,18 +12,25 @@
 .project-import-body { margin-top: 22px; }
 .home-hub { margin-top: 2px; }
 .home-hub > .section-heading { align-items: center; }
-.hub-filters { display: flex; flex-wrap: wrap; gap: 16px; margin: 22px 0; }
-.hub-filters label { display: grid; gap: 7px; flex: 1 1 200px; max-width: 440px; color: #4d6386; }
+.hub-filters { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; margin: 22px 0; }
+.hub-filters:has(.hub-status-filter) { grid-template-columns: minmax(0, 1fr) 180px; }
+.hub-filters label, .hub-job-filter { display: grid; gap: 7px; min-width: 0; color: #4d6386; }
 .hub-filters select { width: 100%; }
+.hub-job-filter { position: relative; }
+.hub-job-trigger { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 50px; padding: 11px 15px; border: 1px solid #bdcdec; border-radius: 9px; background: #fff; color: #284a85; text-align: left; }
+.hub-job-trigger > span, .hub-job-options button > span { min-width: 0; }.hub-job-trigger strong, .hub-job-options strong { display: block; font-size: 15px; font-weight: 550; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }.hub-job-trigger small, .hub-job-options small { display: block; color: #7285a2; font-size: 12px; line-height: 1.6; margin-bottom: 3px; }.hub-job-trigger > svg { flex-shrink: 0; transform: rotate(90deg); }.hub-job-trigger[aria-expanded=true] { border-color: #6488e6; box-shadow: 0 0 0 3px #2452e810; }
+.hub-job-options { position: absolute; z-index: 35; top: calc(100% + 8px); left: 0; right: 0; overflow-y: auto; overscroll-behavior: contain; padding: 6px; border: 1px solid #c4d3ef; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px #1c3d7526; }.hub-job-options[data-above=true] { top: auto; bottom: calc(100% + 8px); }.hub-job-options > button { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 46px; text-align: left; background: #fff; border: 1px solid transparent; border-radius: 7px; padding: 10px 12px; color: #284575; }.hub-job-options > button[aria-selected=true] { background: #edf3ff; color: #2452e8; }.hub-job-options > button:hover, .hub-job-options > button:focus-visible { background: #f0f5ff; border-color: #a8bfed; }.hub-job-options > button > svg { flex-shrink: 0; }
 .hub-empty { min-height: 190px; display: grid; justify-items: center; align-content: center; gap: 16px; text-align: center; color: #526b95; padding: 25px 12px; }
 .hub-empty > svg { color: #2452e8; }
 .hub-task-list { display: grid; gap: 12px; margin-bottom: 18px; }
 .hub-task, .hub-saved-card { border: 1px solid #d6e1f3; border-radius: 13px; padding: 20px; background: #fbfcff; min-width: 0; }
 .hub-task > label { align-items: flex-start; margin-bottom: 8px; font-size: 16px; }
 .hub-task input { flex-shrink: 0; margin-top: 5px; width: 18px; height: 18px; accent-color: #2452e8; }
-.hub-task-footer, .hub-card-meta { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.hub-task-footer > div { display: flex; flex-wrap: wrap; gap: 4px 12px; }
-.hub-task-footer .text-button { padding: 6px 0; text-align: left; }
+.hub-card-meta { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.hub-task-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 14px 20px; margin-top: 16px; }
+.hub-task-footer > div { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.hub-job-link { display: flex; flex: 1 1 260px; align-items: center; justify-content: space-between; gap: 14px; min-width: 0; max-width: 100%; min-height: 48px; text-align: left; border: 1px solid #c8d7f0; border-radius: 9px; padding: 10px 14px; background: #fff; color: #36588c; }.hub-job-link > span { min-width: 0; }.hub-job-link small { display: block; font-size: 12px; color: #7a8eac; margin-bottom: 3px; }.hub-job-link strong { display: block; font-size: 14px; line-height: 1.7; font-weight: 550; white-space: normal; overflow-wrap: anywhere; }.hub-job-link > svg { flex-shrink: 0; }.hub-job-link:hover { border-color: #8cacec; background: #f3f7ff; }
+.hub-task-footer .hub-remove { min-width: 88px; min-height: 44px; padding: 10px 20px; white-space: nowrap; font-size: 14px; }
 .hub-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .hub-saved-card h3 { margin: 15px 0 10px; }
 .hub-saved-card p { color: #435b80; }
@@ -82,7 +89,8 @@
   .app-main .workspace-tabs.understanding-tabs button { flex: 1 1 calc(33.333% - 6px); font-size: 14px; padding: 10px 6px; }
   .app-main .workspace-tabs:is(.understanding-tabs, .content-tabs) button span { flex-basis: auto; }
   .hub-card-grid { grid-template-columns: minmax(0, 1fr); }
-  .hub-filters { gap: 12px; }.hub-filters label { flex-basis: calc(50% - 6px); min-width: 0; }
+  .hub-filters, .hub-filters:has(.hub-status-filter) { grid-template-columns: minmax(0, 1fr); gap: 14px; }.hub-status-filter { max-width: 200px; }.hub-job-trigger { padding: 10px 12px; }.hub-job-options > button { padding: 10px; }
+  .hub-task-footer { grid-template-columns: minmax(0, 1fr); gap: 12px; }.hub-task-footer .hub-remove { justify-self: end; }.hub-job-link { padding: 11px 13px; }
   .hub-task, .hub-saved-card { padding: 16px; }
   .project-import-card > summary { align-items: flex-start; }.project-import-card h2 { font-size: 19px; line-height: 1.6; }
   .project-import-toggle { padding: 7px 9px; font-size: 13px; }
