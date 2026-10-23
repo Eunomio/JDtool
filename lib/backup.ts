@@ -3,6 +3,7 @@ import { database, statuses, projectStages } from './database';
 import { discardTaskChanges } from './task-storage';
 import { storedClassificationSchema, roleCategoryIdSchema } from './classification-schema';
 import { normalizeHiringType } from './job-normalization';
+import { discardPracticeDrafts } from './practice-drafts';
 
 const id = z.string().min(1).max(300);
 const text = z.string();
@@ -38,7 +39,8 @@ const backupSchema = z.object({
   tasks: z.array(z.object({ id, text, jobIds: ids.min(1), done: z.boolean(), order: z.number().finite(), createdAt: date })).default([]),
   practice: z.array(z.object({ id, jobId: id, type: z.enum(['interview', 'scenario']), inputVersion: text, updatedAt: date, data: z.object({
     exercise: exercise.optional(), answer: text, followup: text, supplement: text, feedback: feedback.nullable(), node: z.number().int().min(0).max(1),
-    moves: z.array(z.object({ node: z.number().int().min(0).max(1), action: text, dialogue: text, consequence: text })), choice: text, question: text,
+    moves: z.array(z.object({ node: z.number().int().min(0).max(1), action: text, dialogue: text, consequence: text, kind: z.enum(['question', 'plan']).optional(), colleague: text.optional() })), choice: text, question: text,
+    pendingMessage: z.object({ node: z.number().int().min(0).max(1), kind: z.enum(['question', 'plan', 'answer', 'supplement']), text }).optional(), reviewOpen: z.boolean().optional(),
     response: z.object({ dialogue: text, consequence: text, feedback: feedback.nullable().optional() }).nullable(),
   }) })).default([]),
 });
@@ -75,4 +77,5 @@ export async function restoreBackup(data: Backup) {
     for (const table of tables) if (data[table].length) await database.table(table).bulkPut(data[table]);
   });
   discardTaskChanges(data.tasks.map((task) => task.id));
+  discardPracticeDrafts(database.accountId, data.practice.map(record => record.id));
 }

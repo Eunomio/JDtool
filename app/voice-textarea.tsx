@@ -6,7 +6,7 @@ import { encodeVoiceWav } from '../lib/voice-wav';
 import { AsyncStatus } from './async-status';
 import { Icon } from './ui';
 
-export default function VoiceTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export default function VoiceTextarea({ voicePresentation = 'dialog', autoGrow = false, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { voicePresentation?: 'dialog' | 'inline'; autoGrow?: boolean }) {
   const field = useRef<HTMLTextAreaElement>(null); const dialog = useRef<HTMLDialogElement>(null);
   const [caption, setCaption] = useState(''); const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<'idle' | 'permission' | 'recording' | 'transcribing'>('idle');
@@ -16,6 +16,7 @@ export default function VoiceTextarea(props: TextareaHTMLAttributes<HTMLTextArea
   const request = useRef<AbortController | null>(null); const generation = useRef(0); const range = useRef<[number, number]>([0, 0]); const pointerRange = useRef<[number, number] | null>(null); const alive = useRef(true);
   const lastAudio = useRef<ArrayBuffer | null>(null);
   useLayoutEffect(() => { const label = field.current?.closest('label'); setCaption(props['aria-label'] || [...(label?.childNodes || [])].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join('').trim() || '这段文字'); }, [props['aria-label']]);
+  useLayoutEffect(() => { const target = field.current; if (autoGrow && target?.getClientRects().length) { target.style.height = 'auto'; target.style.height = `${Math.min(116, Math.max(40, target.scrollHeight))}px`; } }, [autoGrow, props.value, open]);
   function stopCapture() {
     if (clock.current) clearInterval(clock.current); clock.current = null;
     const active = capture.current; capture.current = null;
@@ -23,7 +24,7 @@ export default function VoiceTextarea(props: TextareaHTMLAttributes<HTMLTextArea
   }
   function close() { generation.current++; request.current?.abort(); stopCapture(); chunks.current = []; lastAudio.current = null; setPhase('idle'); setOpen(false); }
   useEffect(() => { alive.current = true; return () => { alive.current = false; generation.current++; request.current?.abort(); stopCapture(); chunks.current = []; lastAudio.current = null; }; }, []);
-  useEffect(() => { if (open) dialog.current?.showModal(); }, [open]);
+  useEffect(() => { if (open && voicePresentation === 'dialog') dialog.current?.showModal(); }, [open, voicePresentation]);
   async function stopAndRecognize() {
     const active = capture.current; if (!active) return;
     const audio = encodeVoiceWav(chunks.current, active.context.sampleRate); chunks.current = []; stopCapture(); lastAudio.current = audio; await recognize(audio);
@@ -70,11 +71,11 @@ export default function VoiceTextarea(props: TextareaHTMLAttributes<HTMLTextArea
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(target, next);
     target.dispatchEvent(new Event('input', { bubbles: true })); close(); requestAnimationFrame(() => { target.focus(); target.setSelectionRange(start + text.trim().length, start + text.trim().length); });
   }
-  return <div className="voice-field"><textarea {...props} ref={field} aria-label={props['aria-label'] || caption || undefined} />{!props.readOnly && <button type="button" className="voice-trigger" disabled={props.disabled} aria-label={`语音输入：${caption || '这段文字'}`} onPointerDown={() => { const target = field.current; if (target) pointerRange.current = document.activeElement === target ? [target.selectionStart, target.selectionEnd] : [target.value.length, target.value.length]; }} onClick={event => { event.preventDefault(); event.stopPropagation(); range.current = pointerRange.current || [field.current?.value.length || 0, field.current?.value.length || 0]; pointerRange.current = null; setText(''); setError(''); setPhase('idle'); setOpen(true); }}><Icon name="mic" size={16} />语音输入</button>}
-    {open && createPortal(<dialog ref={dialog} className="voice-dialog" aria-labelledby="voice-heading" onCancel={event => { event.preventDefault(); close(); }} onClose={() => { if (open) close(); }}><header><div><h2 id="voice-heading">语音输入</h2><p>{caption}</p></div><button className="secondary small" aria-label="关闭语音输入" onClick={close}>×</button></header><p className="voice-notice">录音用于转写，核对后再填入。单次最多60秒，可分段继续录音。</p>
+  const recorder = <><header><div><h2 id="voice-heading">语音输入</h2><p>{caption}</p></div><button className="secondary small" aria-label="关闭语音输入" onClick={close}>×</button></header><p className="voice-notice">录音用于转写，核对后再填入。单次最多60秒，可分段继续录音。</p>
       {error && <div className="notice error" role="alert">{error}{lastAudio.current && phase === 'idle' && <button type="button" className="secondary" onClick={() => { if (lastAudio.current) void recognize(lastAudio.current); }}>重试识别这段录音</button>}{error.includes('嵌入页面') && <a className="secondary" href={window.location.href} target="_blank" rel="noreferrer">在独立窗口打开</a>}</div>}
       {phase === 'transcribing' ? <AsyncStatus label="正在识别语音" onCancel={() => request.current?.abort()} /> : <div className={`voice-capture ${phase === 'recording' ? 'recording' : ''}`}><span className="voice-mic"><Icon name="mic" size={30} /></span><div className="voice-wave" aria-hidden="true">{[.5, .8, 1, .7, .9].map((weight, index) => <i key={index} style={{ height: `${8 + level * weight * 46}px` }} />)}</div><strong role="status">{phase === 'recording' ? `正在录音 ${seconds} / 60秒` : phase === 'permission' ? '正在申请麦克风…' : '准备好后开始录音'}</strong><button type="button" className={phase === 'recording' ? 'voice-stop' : 'primary'} disabled={phase === 'permission'} onClick={() => phase === 'recording' ? void stopAndRecognize() : void start()}>{phase === 'recording' ? '停止并识别' : text ? '继续录音' : '开始录音'}</button></div>}
-      <label className="voice-preview-label">识别文字<textarea aria-label="识别文字" rows={5} value={text} onChange={event => setText(event.target.value)} placeholder="识别完成后，可在这里核对和修改" /></label><footer><button className="secondary" onClick={close}>取消</button><button className="primary" disabled={!text.trim() || phase !== 'idle'} onClick={insert}>填入文字<Icon name="arrow" size={15} /></button></footer>
-    </dialog>, document.body)}
+      <label className="voice-preview-label">识别文字<textarea aria-label="识别文字" rows={5} value={text} onChange={event => setText(event.target.value)} placeholder="识别完成后，可在这里核对和修改" /></label><footer><button className="secondary" onClick={close}>取消</button><button className="primary" disabled={!text.trim() || phase !== 'idle'} onClick={insert}>填入文字<Icon name="arrow" size={15} /></button></footer></>;
+  return <div className="voice-field" data-voice-inline={open && voicePresentation === 'inline'}><textarea {...props} ref={field} aria-label={props['aria-label'] || caption || undefined} />{!props.readOnly && <button type="button" className="voice-trigger" disabled={props.disabled} aria-label={`语音输入：${caption || '这段文字'}`} onPointerDown={() => { const target = field.current; if (target) pointerRange.current = document.activeElement === target ? [target.selectionStart, target.selectionEnd] : [target.value.length, target.value.length]; }} onClick={event => { event.preventDefault(); event.stopPropagation(); range.current = pointerRange.current || [field.current?.value.length || 0, field.current?.value.length || 0]; pointerRange.current = null; setText(''); setError(''); setPhase('idle'); setOpen(true); }}><Icon name="mic" size={16} />语音输入</button>}
+    {open && (voicePresentation === 'inline' ? <section className="voice-inline" role="region" aria-label="语音输入">{recorder}</section> : createPortal(<dialog ref={dialog} className="voice-dialog" aria-labelledby="voice-heading" onCancel={event => { event.preventDefault(); close(); }} onClose={() => { if (open) close(); }}>{recorder}</dialog>, document.body))}
   </div>;
 }

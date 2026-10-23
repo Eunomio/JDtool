@@ -15,8 +15,8 @@ export const tutorialSteps = [
   { id: 'match', target: 'project-builder', focus: '.builder-columns', title: '选择匹配的项目', text: '根据JD推荐相关项目，并整理简历要点和面试提纲。核对内容后，勾选采用即可复制。', next: '下一步' },
   { id: 'preparation', target: 'preparation-card', focus: '.preparation-content', title: '查看准备建议', text: '准备卡列出岗位重点、可用经历和待补内容。点击“加入我的计划”，记下要做的事。', next: '下一步' },
   { id: 'practice', target: 'practice-launch', title: '选择练习方式', text: '点击“模拟面试”练习回答，或点击“体验岗位一天”尝试处理工作任务。', next: '下一步' },
-  { id: 'interview', target: 'interview-practice', focus: '.page-stack', title: '试试模拟面试', text: '提交回答后会收到一次追问，补充回答后可查看复盘。示例已填好，也可直接点击“下一步”。', next: '下一步' },
-  { id: 'scenario', target: 'scenario-practice', focus: '.work-task, .page-stack', title: '体验岗位工作', text: '向同事了解情况，选择或填写处理方案，再查看工作反馈。完成两项任务后可查看复盘。', next: '下一步' },
+  { id: 'interview', target: 'interview-practice', focus: '.chat-composer', title: '试试模拟面试', text: '题目在上方，回答从下方对话框发送。收到追问后继续回答，完成后查看复盘；也可直接点击“下一步”。', next: '下一步' },
+  { id: 'scenario', target: 'scenario-practice', focus: '.chat-composer', title: '体验岗位工作', text: '在私聊中向同事了解情况，切换“提交方案”发送自己的做法。完成两项任务后查看复盘。', next: '下一步' },
   { id: 'plan', target: 'weekly-plan', title: '管理准备计划', text: '加入计划的事项会显示在“本周准备”，完成后勾选即可。点击“完成教程”返回首页。', next: '完成教程' },
 ] as const;
 export type TutorialStep = typeof tutorialSteps[number]['id'];

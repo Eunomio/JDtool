@@ -81,11 +81,12 @@ test('面试一次追问、复盘保存与两决策剧情', async ({ page }) => 
   await page.getByRole('button', { name: '提交回答，获得追问' }).click();
   await expect(page.getByText('你会如何验证改进的效果？', { exact: true })).toBeVisible();
   await page.getByLabel('补充回答', { exact: true }).fill('先小范围验证任务完成率。'); await page.getByRole('button', { name: '提交补充，查看复盘' }).click();
+  await page.getByRole('button', { name: '查看本轮复盘', exact: true }).click();
   await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
   await navigate(page, '岗位体验');
-  await page.getByRole('radio').first().check(); await page.getByRole('button', { name: '提交行动', exact: true }).click();
+  await page.getByRole('tab', { name: '提交方案', exact: true }).click(); await page.getByRole('textbox', { name: '我的方案', exact: true }).fill('先核对反馈与问题范围，再确定验证方式和协作安排。'); await page.getByRole('button', { name: '提交方案', exact: true }).click();
   await page.getByRole('button', { name: '继续下一项任务' }).click();
-  await page.getByRole('radio').first().check(); await page.getByRole('button', { name: '提交行动', exact: true }).click();
+  await page.getByRole('tab', { name: '提交方案', exact: true }).click(); await page.getByRole('textbox', { name: '我的方案', exact: true }).fill('先核对反馈与问题范围，再确定验证方式和协作安排。'); await page.getByRole('button', { name: '提交方案', exact: true }).click();
   await page.getByRole('button', { name: '查看任务复盘' }).click(); await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
   await page.reload(); await navigate(page, '岗位体验'); await page.getByLabel('选择目标岗位').selectOption('sample-iflytek-pm');
   await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();

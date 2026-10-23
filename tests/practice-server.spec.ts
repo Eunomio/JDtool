@@ -29,3 +29,9 @@ test('备份支持只包含面试题的练习，拒绝任务缺失的岗位体�
   const data = { format: 'jdtool-backup', version: 2, jobs: [], practice: [{ id: 'p1', jobId: 'j1', type: 'interview', inputVersion: '', updatedAt: new Date().toISOString(), data: { exercise: { id: 'e1', direction: '', background: '', question: '', dimensions: [], followupDirections: [], nodes: [] }, answer: '', followup: '', supplement: '', feedback: null, node: 0, moves: [], choice: '', question: '', response: null } }] };
   expect(parseBackup(data).practice).toHaveLength(1); data.practice[0].type = 'scenario'; expect(() => parseBackup(data)).toThrow('岗位体验任务不完整');
 });
+
+test('聊天待回复消息、消息用途与复盘浏览位置随备份保留', () => {
+  const data = { format: 'jdtool-backup', version: 2, jobs: [], practice: [{ id: 'p1', jobId: 'j1', type: 'scenario', inputVersion: '', updatedAt: new Date().toISOString(), data: { answer: '', followup: '', supplement: '', feedback: null, node: 1, moves: [{ node: 0, kind: 'plan', colleague: 'Mentor', action: '先核对用户反馈', dialogue: '可以先核对', consequence: '便于判断范围' }], choice: '接着做验证', question: '', response: null, pendingMessage: { node: 1, kind: 'plan', text: '接着做验证' }, reviewOpen: false } }] };
+  const restored = parseBackup(data).practice[0].data;
+  expect(restored.pendingMessage).toEqual(data.practice[0].data.pendingMessage); expect(restored.moves[0].kind).toBe('plan'); expect(restored.moves[0].colleague).toBe('Mentor'); expect(restored.reviewOpen).toBe(false);
+});

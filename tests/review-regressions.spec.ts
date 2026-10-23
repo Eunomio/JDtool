@@ -188,19 +188,20 @@ test('重启练习保留JD题目，JD更新后重新生成对应题目，并保�
   });
   await importBackup(page); await navigate(page, '模拟面试');
   await expect(page.getByText(exercise.question, { exact: true })).toBeVisible();
-  const restart = page.getByRole('button', { name: '重新开始', exact: true }); await expect(restart).toBeEnabled();
+  await page.locator('.practice-menu > summary').click(); const restart = page.getByRole('button', { name: '重新开始', exact: true }); await expect(restart).toBeEnabled();
   page.once('dialog', (dialog) => dialog.accept()); await restart.click();
   await expect(page.getByText(exercise.question, { exact: true })).toBeVisible(); expect(exercises).toBe(1);
   await page.getByLabel('我的回答', { exact: true }).fill('先确定事务边界。'); await page.getByRole('button', { name: '提交回答，获得追问' }).click();
   await expect(page.getByText('请解释序列化隔离级别。', { exact: true })).toBeVisible();
   await page.getByLabel('补充回答', { exact: true }).fill('避免并发事务出现不一致。'); await page.getByRole('button', { name: '提交补充，查看复盘' }).click();
+  await page.getByRole('button', { name: '查看本轮复盘', exact: true }).click();
   await expect(page.getByRole('heading', { name: '本次复盘', exact: true })).toBeVisible();
   await openJob(page); await page.getByRole('button', { name: '编辑JD', exact: true }).click();
   await page.getByRole('textbox', { name: '岗位原文', exact: true }).fill('职责：设计消息队列的可靠投递机制。要求：掌握队列事务。');
   await page.getByRole('button', { name: '保存岗位', exact: true }).click();
   await navigate(page, '模拟面试');
   await expect(page.getByText('岗位或公司资料已更新，这份记录来自更新前的练习，可重新开始。', { exact: true })).toBeVisible();
-  page.once('dialog', (dialog) => dialog.accept()); await page.getByRole('button', { name: '重新开始', exact: true }).click();
+  await page.locator('.practice-menu > summary').click(); page.once('dialog', (dialog) => dialog.accept()); await page.getByRole('button', { name: '重新开始', exact: true }).click();
   await expect(page.getByText('如何保证消息队列的可靠投递？', { exact: true })).toBeVisible(); expect(exercises).toBe(2);
 });
 

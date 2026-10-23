@@ -1,10 +1,11 @@
 import { database, type CompanyResult, type CompareResult, type Job, type PracticeSession, type PreparationResult, type RecommendationResult, type SavedResult, type Source, type Task } from './database';
 import { adviceTexts, projectDeletionVersion } from './project-storage';
+import { discardPracticeDrafts } from './practice-drafts';
 
 export type DeletedJob = { job: Job; projectDeletionVersion: string | null; sources: Source[]; recommendations: SavedResult<RecommendationResult>[]; preparations: SavedResult<PreparationResult>[]; companies: SavedResult<CompanyResult>[]; practice: PracticeSession[]; tasks: Task[]; comparisons: SavedResult<CompareResult>[] };
 
 export async function deleteJob(job: Job): Promise<DeletedJob> {
-  return database.transaction('rw', database.tables, async () => {
+  const removed = await database.transaction('rw', database.tables, async () => {
     const bundle: DeletedJob = {
       job, projectDeletionVersion: projectDeletionVersion(), sources: await database.sources.where('jobId').equals(job.id).toArray(),
       recommendations: await database.recommendations.where('jobId').equals(job.id).toArray(),
@@ -24,6 +25,8 @@ export async function deleteJob(job: Job): Promise<DeletedJob> {
     }
     return bundle;
   });
+  discardPracticeDrafts(database.accountId, [`interview-${job.id}`, `scenario-${job.id}`]);
+  return removed;
 }
 
 export async function restoreJob(bundle: DeletedJob) {

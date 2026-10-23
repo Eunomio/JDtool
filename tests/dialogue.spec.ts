@@ -22,7 +22,7 @@ test('岗位体验的角色与发消息说明在气泡外，首条及后续消�
   await expect(first.locator('.colleague-meta > span')).toHaveText('发来消息');
   await expect(first.locator('.colleague-bubble .colleague-meta')).toHaveCount(0);
   await expect(page.locator('.task-deliverable')).toHaveText('交付要求：给出优先级及理由。');
-  await page.getByText('信息还不够？向产品经理提问', { exact: true }).click();
+
   await page.getByLabel('向产品经理提问', { exact: true }).fill('两类问题各影响多少用户？');
   await page.getByRole('button', { name: '发送问题', exact: false }).click();
   await expect(page.locator('.work-exchange .colleague-bubble')).toHaveText(reply);

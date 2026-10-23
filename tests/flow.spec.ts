@@ -58,7 +58,7 @@ test('面试只请求当前模式，等待有动画和计时，停止后可重�
   let calls = 0; let release!: () => void; const pending = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/api/assist', async route => { calls++; expect(route.request().postDataJSON().mode).toBe('interview'); if (calls === 1) await pending; await route.fulfill({ json: exercise }).catch(() => {}); });
   await seed(page); await navigate(page, '模拟面试');
-  const indicator = page.locator('.request-indicator'); await expect(indicator).toBeVisible(); await expect(page.locator('.practice-skeleton')).toBeVisible(); await expect(indicator.locator('.async-spinner')).toBeVisible();
+  const indicator = page.locator('.chat-loading .async-status'); await expect(indicator).toBeVisible(); await expect(page.locator('.practice-skeleton')).toBeVisible(); await expect(indicator.locator('.async-spinner')).toBeVisible();
   await expect(indicator.locator('.async-elapsed')).toContainText(/秒/); await indicator.getByRole('button', { name: '停止', exact: true }).click(); release();
   await expect(page.locator('.practice').getByRole('alert')).toContainText('已停止'); await page.getByRole('button', { name: '重新准备题目', exact: true }).click(); await expect(page.getByRole('textbox', { name: '我的回答', exact: true })).toBeVisible();
   await navigate(page, '岗位清单'); await navigate(page, '模拟面试'); await expect(page.getByRole('textbox', { name: '我的回答', exact: true })).toBeVisible(); expect(calls).toBe(2);
