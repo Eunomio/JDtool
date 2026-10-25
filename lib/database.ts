@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { RoleCategoryId, RoleClassification } from './role-taxonomy';
 import type { SyncState } from './workspace-data';
+import type { PersonalProfile } from './personal-profile';
 
 export const statuses = ['关注中', '准备投递', '已投递', '笔试/测评', '面试中', '已获Offer', '已结束'] as const;
 export type JobStatus = typeof statuses[number];
@@ -28,6 +29,7 @@ export type Job = {
   statusHistory?: { status: JobStatus; at: string }[];
   status: JobStatus;
   nextAction: string;
+  nextActionTaskId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -49,7 +51,7 @@ export type PreparationResult = { priorities: Advice[]; strengths: Advice[]; gap
 export type CompanyResult = { facts: Advice[]; hypotheses: Advice[]; questions: Advice[]; research?: { company: string; summary: string; identityNote: string; queries: string[]; searchedAt: string }; roleInsights?: Advice[]; businesses?: Advice[] };
 export type CompareResult = { common: Advice[]; differences: { jobId: string; uniqueRequirements: Advice[]; projects: Advice[]; preparation: Advice[] }[]; reusable: Advice[] };
 export type SavedResult<T> = { id: string; jobId: string; inputVersion: string; projectVersions?: { id: string; updatedAt: string }[]; createdAt: string; data: T };
-export type Task = { id: string; text: string; jobIds: string[]; done: boolean; order: number; createdAt: string };
+export type Task = { id: string; text: string; jobIds: string[]; done: boolean; order: number; createdAt: string; origin?: 'job-next-action' };
 export type PracticeFeedback = { strengths: string[]; dimensions: { name: string; feedback: string; requirementIds: string[] }[]; improvements: string[]; outline: string[]; nextActions: string[] };
 export type PracticeSession = { id: string; jobId: string; type: 'interview' | 'scenario'; inputVersion: string; data: Record<string, unknown>; updatedAt: string };
 
@@ -64,6 +66,7 @@ export class JobDatabase extends Dexie {
   comparisons!: Table<SavedResult<CompareResult>, string>;
   tasks!: Table<Task, string>;
   practice!: Table<PracticeSession, string>;
+  profiles!: Table<PersonalProfile, string>;
 
   constructor(public accountId = 'legacy', public accountRole: 'admin' | 'member' | 'legacy' = 'legacy') {
     super(accountId === 'legacy' ? 'jdtool' : `jdtool-${accountId}`);
@@ -74,6 +77,7 @@ export class JobDatabase extends Dexie {
       comparisons: 'id, jobId, createdAt', tasks: 'id, order', practice: 'id, jobId, type, updatedAt',
     });
     this.version(3).stores({ sync: 'id' });
+    this.version(4).stores({ profiles: 'id' });
   }
 }
 

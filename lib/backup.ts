@@ -4,6 +4,7 @@ import { discardTaskChanges } from './task-storage';
 import { storedClassificationSchema, roleCategoryIdSchema } from './classification-schema';
 import { normalizeHiringType } from './job-normalization';
 import { discardPracticeDrafts } from './practice-drafts';
+import { personalProfileSchema } from './personal-profile';
 
 const id = z.string().min(1).max(300);
 const text = z.string();
@@ -28,15 +29,16 @@ const job = z.object({
   location: text.optional(), direction: text.optional(), hiringType: text.transform(normalizeHiringType).optional(), responsibilities: z.array(reference).optional(), requirements: z.array(reference).optional(),
   classification: storedClassificationSchema.optional(), categoryOverride: roleCategoryIdSchema.optional(),
   warnings: z.array(text).optional(), parsedAt: date.optional(), sample: z.boolean().optional(), applicationDate: text.optional(), interviewDate: text.optional(), endReason: text.optional(),
-  statusHistory: z.array(z.object({ status: z.enum(statuses), at: date })).optional(), status: z.enum(statuses), nextAction: text, createdAt: date, updatedAt: date,
+  statusHistory: z.array(z.object({ status: z.enum(statuses), at: date })).optional(), status: z.enum(statuses), nextAction: text, nextActionTaskId: id.optional(), createdAt: date, updatedAt: date,
 });
 const project = z.object({ id, name: text, type: text, stage: z.enum(projectStages), timeline: text, role: text, problem: text, actions: text, methods: text, results: text, skills: z.array(text), facts: z.array(fact), sources: z.array(source), confirmed: z.boolean(), sample: z.boolean().optional(), visibility: z.enum(['private', 'display']), redactions: z.array(z.object({ from: text, to: text })), updatedAt: date });
 const backupSchema = z.object({
   format: z.literal('jdtool-backup'), version: z.union([z.literal(1), z.literal(2)]), exportedAt: date.optional(), jobs: z.array(job),
   projects: z.array(project).default([]), sources: z.array(source).default([]),
+  profiles: z.array(personalProfileSchema).max(1).default([]),
   recommendations: z.array(z.object({ ...saved, data: recommendation })).default([]), preparations: z.array(z.object({ ...saved, data: preparation })).default([]),
   companies: z.array(z.object({ ...saved, data: company })).default([]), comparisons: z.array(z.object({ ...saved, data: comparison })).default([]),
-  tasks: z.array(z.object({ id, text, jobIds: ids.min(1), done: z.boolean(), order: z.number().finite(), createdAt: date })).default([]),
+  tasks: z.array(z.object({ id, text, jobIds: ids.min(1), done: z.boolean(), order: z.number().finite(), createdAt: date, origin: z.literal('job-next-action').optional() })).default([]),
   practice: z.array(z.object({ id, jobId: id, type: z.enum(['interview', 'scenario']), inputVersion: text, updatedAt: date, data: z.object({
     exercise: exercise.optional(), answer: text, followup: text, supplement: text, feedback: feedback.nullable(), node: z.number().int().min(0).max(1),
     moves: z.array(z.object({ node: z.number().int().min(0).max(1), action: text, dialogue: text, consequence: text, kind: z.enum(['question', 'plan']).optional(), colleague: text.optional() })), choice: text, question: text,
@@ -45,7 +47,7 @@ const backupSchema = z.object({
   }) })).default([]),
 });
 export type Backup = z.infer<typeof backupSchema>;
-const tables = ['jobs', 'projects', 'sources', 'recommendations', 'preparations', 'companies', 'comparisons', 'tasks', 'practice'] as const;
+const tables = ['jobs', 'projects', 'sources', 'recommendations', 'preparations', 'companies', 'comparisons', 'tasks', 'practice', 'profiles'] as const;
 
 function unique(values: string[]) { return new Set(values).size === values.length; }
 

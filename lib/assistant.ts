@@ -105,7 +105,7 @@ export async function assist(input: AssistInput) {
   }
   if (['recommendations', 'preparation', 'company', 'interview', 'scenario'].includes(input.action) && !input.job) throw new AppError(400, 'MISSING_JOB', '请先选择目标岗位。');
   if (input.action === 'recommendations') {
-    if (!input.projects?.length) throw new AppError(400, 'MISSING_PROJECTS', '请先在我的项目中确认项目事实。');
+    if (!input.projects?.length) throw new AppError(400, 'MISSING_PROJECTS', '请先在“我的信息”的项目经历中确认项目事实。');
     const data = await generate(recommendationOutput, '按当前JD从确认的项目中通常选2个有明确关联的项目，最多3个并排序，恰好1个primary其余supporting。结合preference保留用户选择倾向，仍需解释与JD的关系。matchType=direct直接相关/transferable方法可迁移/needs_more需要补充。每个项目推荐以及每条resumeBullets、interviewOutline都附本人项目的factIds。每个项目给1—2条简历要点，面试提纲可用1—2段覆盖背景、我的行动、结果或当前进展、岗位关联。允许改变排序和侧重点，禁止更改原行业、本人角色、完成阶段，禁止把汽车项目改成做过穿戴项目；禁止新增未记录数字或成果。没有明确结果时保留当前进展，不能把做过评价框架写成优化了体验标准。阶段“构思/进行中”是合并标签，必须结合事实判断，事实明确进行中就不能写为构思。缺口放gaps，needsReview只列需要补充事实或核对的具体表述，不评价课程项目专业度或贬低任何项目。' + '每个推荐项目必须输出coverage数组，逐项分析当前JD的requirements和responsibilities：direct表示有本人已确认事实直接支撑，transferable表示仅方法或经验可迁移，每项包含requirementId、kind、本人项目factIds；缺乏依据的要求不列入coverage。不得仅凭岗位名称、项目名称或一句相近表述认定满足技术、学历、年限、到岗等要求。简历要点与面试提纲各至少给一条有事实依据的表述。', input);
     const seen = new Set<string>();
     data.recommendations = data.recommendations.filter((recommendation) => {

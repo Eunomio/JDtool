@@ -2,12 +2,12 @@ import { z } from 'zod';
 import { accountStore, requireUser } from '../../../lib/account-server';
 import { AppError, errorResponse, readJson } from '../../../lib/errors';
 import { parseBackup } from '../../../lib/backup';
-import { applyWorkspaceChanges, hasDemoData, sameData, workspaceTables, WorkspaceConflict, type WorkspaceSnapshot } from '../../../lib/workspace-data';
+import { applyWorkspaceChanges, emptyWorkspace, hasDemoData, sameData, workspaceTables, WorkspaceConflict, type WorkspaceSnapshot } from '../../../lib/workspace-data';
 
 export const runtime = 'nodejs';
 const row = z.object({ id: z.string().min(1).max(300) }).catchall(z.unknown());
 const inputSchema = z.object({ requestId: z.uuid(), revision: z.number().int().nonnegative(), changes: z.array(z.object({ table: z.enum(workspaceTables), id: z.string().min(1).max(300), before: row.nullable(), after: row.nullable() })).max(10000) });
-const snapshot = (record: { revision: number; data: string }): WorkspaceSnapshot => ({ revision: record.revision, data: JSON.parse(record.data) });
+const snapshot = (record: { revision: number; data: string }): WorkspaceSnapshot => ({ revision: record.revision, data: { ...emptyWorkspace(), ...JSON.parse(record.data) } });
 
 export async function GET(request: Request) {
   try {

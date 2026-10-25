@@ -63,10 +63,10 @@ test('首页长岗位名完整换行，筛选支持键盘和取消，移除按�
 });
 
 test('项目为空时展开导入，保存项目后收起，刷新和重开仍优先显示已有项目', async ({ page }) => {
-  await page.goto('/'); await navigate(page, '我的项目'); const form = page.locator('.project-import-card');
+  await page.goto('/'); await navigate(page, '我的信息'); const form = page.locator('.project-import-card');
   await expect(form).toHaveAttribute('open', ''); await page.getByRole('button', { name: '使用脱敏示例项目', exact: true }).click();
   await expect(page.getByRole('heading', { name: '专业桌面软件升级项目', exact: true })).toBeVisible(); await expect(form).not.toHaveAttribute('open', '');
-  await page.reload(); await navigate(page, '我的项目'); await expect(form).not.toHaveAttribute('open', '');
+  await page.reload(); await navigate(page, '我的信息'); await expect(form).not.toHaveAttribute('open', '');
   await form.locator('summary').first().click(); await expect(page.getByRole('textbox', { name: '简历或项目文字', exact: true })).toBeVisible();
 });
 

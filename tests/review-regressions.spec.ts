@@ -45,7 +45,7 @@ async function stored(page: Page, table: string) {
 test('修改脱敏规则后旧文案和理由同步替换，重新核对后才能复制', async ({ page }) => {
   await page.addInitScript(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (value: string) => { (window as unknown as { copied: string }).copied = value; } } }); });
   await importBackup(page); await assemble(page);
-  await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await page.getByRole('button', { name: '我的信息', exact: true }).click();
   await page.getByRole('button', { name: '编辑与核对' }).click();
   await page.getByRole('radio', { name: '生成可展示版本', exact: true }).check();
   await page.getByLabel('替换规则', { exact: true }).fill('海鸥内部项目 => 某内部产品');
@@ -85,7 +85,7 @@ test('清除项目时清除生成文案及关联计划，保留岗位并可完�
     await expect(other.getByLabel('简历要点1', { exact: true })).toHaveValue(project.facts[0].text);
     await expect(other.getByRole('checkbox', { name: '已核对，采用这条表述' })).toBeChecked();
   } finally { await context.close(); }
-  await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await page.getByRole('button', { name: '我的信息', exact: true }).click();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: '清除简历与项目资料', exact: true }).click();
   await expect(page.getByRole('heading', { name: project.name, exact: true })).toHaveCount(0);
@@ -101,7 +101,7 @@ test('删除单个项目保留其他项目，复制前重新检查记录是否�
   await page.evaluate(() => new Promise<void>((resolve) => { const open = indexedDB.open(`jdtool-${localStorage.getItem('jdtool-active-account')}`); open.onsuccess = () => { const db = open.result; const transaction = db.transaction('projects', 'readwrite'); transaction.objectStore('projects').delete('review-project'); transaction.oncomplete = () => { db.close(); resolve(); }; }; }));
   await page.getByRole('button', { name: '复制已采用的表述' }).click();
   await expect(page.locator('main').getByRole('alert')).toContainText('请先核对当前项目事实');
-  await page.reload(); await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await page.reload(); await page.getByRole('button', { name: '我的信息', exact: true }).click();
   await expect(page.getByRole('heading', { name: other.name, exact: true })).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept()); await page.getByRole('button', { name: '删除项目', exact: true }).click();
   await expect(page.getByRole('heading', { name: other.name, exact: true })).toHaveCount(0);
@@ -134,7 +134,7 @@ test('损坏、嵌套格式异常和关联缺失的备份都不能覆盖现有�
 test('删除未使用的项目保留其他项目的独立文案', async ({ page }) => {
   const other = { ...project, id: 'unused-project', name: '尚未使用的项目', facts: [{ ...project.facts[0], id: 'unused-f1' }] };
   await importBackup(page, { ...backup, projects: [project, other] }); await assemble(page);
-  await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await page.getByRole('button', { name: '我的信息', exact: true }).click();
   page.once('dialog', (dialog) => dialog.accept());
   await page.locator('article').filter({ has: page.getByRole('heading', { name: other.name, exact: true }) }).getByRole('button', { name: '删除项目', exact: true }).click();
   await expect(page.getByRole('heading', { name: other.name, exact: true })).toHaveCount(0);
@@ -154,7 +154,7 @@ test('另一个标签页清除项目后，撤销岗位删除不会恢复已清�
   await expect(page.getByRole('button', { name: '撤销', exact: true })).toBeVisible();
   const other = await context.newPage();
   try {
-    await other.goto('/'); await other.getByRole('button', { name: '我的项目', exact: true }).click();
+    await other.goto('/'); await other.getByRole('button', { name: '我的信息', exact: true }).click();
     await expect(other.getByRole('heading', { name: project.name, exact: true })).toBeVisible();
     other.once('dialog', (dialog) => dialog.accept()); await other.getByRole('button', { name: '清除简历与项目资料', exact: true }).click();
     await expect(other.getByRole('heading', { name: project.name, exact: true })).toHaveCount(0);

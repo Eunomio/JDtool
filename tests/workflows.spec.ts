@@ -10,14 +10,14 @@ test('简历文字提取、事实确认、编辑与刷新恢复', async ({ page 
     expect(route.request().postDataJSON().action).toBe('projects');
     await route.fulfill({ json: { projects: [{ name: '需求分析研究', type: '工作项目', stage: '已测试', timeline: '', role: '需求分析', problem: '', actions: '访谈并整理需求', methods: '访谈', results: '产出需求清单', skills: ['访谈'], facts: [{ text: '访谈并整理需求，产出需求清单', sourceText: '访谈并整理需求，产出需求清单', category: 'action' }], suggestedRedactions: [] }] } });
   });
-  await page.goto('/'); await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await page.goto('/'); await page.getByRole('button', { name: '我的信息', exact: true }).click();
   await page.getByLabel('简历或项目文字', { exact: true }).fill('需求分析研究：访谈并整理需求，产出需求清单');
   await page.getByRole('button', { name: '解析为项目事实', exact: true }).click();
   await page.getByRole('button', { name: '核对并新增', exact: true }).click();
   await page.getByRole('checkbox', { name: '我已核对本人角色、项目阶段、事实与结果' }).check();
   await page.getByRole('button', { name: '保存项目事实', exact: true }).click();
   await expect(page.getByRole('heading', { name: '需求分析研究', exact: true })).toBeVisible();
-  await page.reload(); await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await page.reload(); await page.getByRole('button', { name: '我的信息', exact: true }).click();
   await expect(page.getByText('事实已确认', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: '编辑与核对' }).click();
   await expect(page.getByLabel('事实条目', { exact: true })).toHaveValue('访谈并整理需求，产出需求清单');
@@ -33,7 +33,7 @@ test('简历文字提取、事实确认、编辑与刷新恢复', async ({ page 
 
 test('样本项目、岗位准备卡、事实组装与加入计划', async ({ page }) => {
   await page.route('**/api/assist', (route) => route.fulfill({ json: { priorities: [advice], strengths: [advice], gaps: [], companyResearch: [] } }));
-  await seedJobs(page); await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await seedJobs(page); await page.getByRole('button', { name: '我的信息', exact: true }).click();
   await page.getByRole('button', { name: '使用脱敏示例项目' }).click();
   await expect(page.getByRole('heading', { name: '专业桌面软件升级项目', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '岗位清单', exact: true }).click();

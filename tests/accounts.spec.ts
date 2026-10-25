@@ -38,7 +38,7 @@ test('注册和登录只有两个字段，重复账号与错误密码显示清�
   await expect(page.getByRole('button', { name: '首页', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText('从一个感兴趣的岗位开始', { exact: true })).toBeVisible();
   await nav(page, '岗位清单'); await expect(page.getByRole('button', { name: '体验6个示例岗位' })).toHaveCount(0);
-  await nav(page, '我的项目'); await expect(page.getByRole('button', { name: '使用脱敏示例项目' })).toHaveCount(0);
+  await nav(page, '我的信息'); await expect(page.getByRole('button', { name: '使用脱敏示例项目' })).toHaveCount(0);
   await context.clearCookies(); await page.goto('/'); await page.getByLabel('账号', { exact: true }).fill('P01'); await page.getByLabel('密码', { exact: true }).fill('wrong'); await page.getByRole('button', { name: '登录并继续准备' }).click(); await expect(page.locator('main').getByRole('alert')).toContainText('账号或密码不正确');
 });
 
@@ -72,7 +72,7 @@ test('手机、平板与桌面没有整页横向溢出，导航与表单始终�
   await signIn(page, username()); await addJob(page, '长岗位名称与跨团队需求分析产品经理ProductManager');
   for (const width of [320, 390, 600, 767, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const destination of ['首页', '岗位清单', '岗位详情', '我的项目', '岗位比较']) {
+    for (const destination of ['首页', '岗位清单', '岗位详情', '我的信息', '岗位比较']) {
       await nav(page, destination); await expect(page.locator('main.app-main')).toBeVisible();
       const dimensions = await page.evaluate(() => ({ visible: innerWidth, full: document.documentElement.scrollWidth })); expect(dimensions.full, `${width}px / ${destination}`).toBeLessThanOrEqual(dimensions.visible);
     }

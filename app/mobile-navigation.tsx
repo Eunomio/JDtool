@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './ui';
 
 type Destination = 'home' | 'jobs' | 'detail' | 'projects' | 'compare' | 'interview' | 'scenario';
-const primary = [{ id: 'home', label: '首页', icon: 'home' }, { id: 'jobs', label: '岗位清单', icon: 'jobs' }, { id: 'detail', label: '岗位详情', icon: 'detail' }, { id: 'projects', label: '我的项目', icon: 'projects' }] as const;
+const primary = [{ id: 'home', label: '首页', icon: 'home' }, { id: 'jobs', label: '岗位清单', icon: 'jobs' }, { id: 'detail', label: '岗位详情', icon: 'detail' }, { id: 'projects', label: '我的信息', icon: 'projects' }] as const;
 const secondary = [{ id: 'compare', label: '岗位比较', icon: 'compare' }, { id: 'interview', label: '模拟面试', icon: 'interview' }, { id: 'scenario', label: '岗位体验', icon: 'scenario' }] as const;
 export default function MobileNavigation({ page, onNavigate }: { page: string; onNavigate: (page: Destination) => void }) {
   const [more, setMore] = useState(false); const dialog = useRef<HTMLDialogElement>(null);

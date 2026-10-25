@@ -1,6 +1,6 @@
 import type { Backup } from './backup';
 
-export const workspaceTables = ['jobs', 'projects', 'sources', 'recommendations', 'preparations', 'companies', 'comparisons', 'tasks', 'practice'] as const;
+export const workspaceTables = ['jobs', 'projects', 'sources', 'recommendations', 'preparations', 'companies', 'comparisons', 'tasks', 'practice', 'profiles'] as const;
 export type WorkspaceTable = typeof workspaceTables[number];
 export type WorkspaceData = Pick<Backup, WorkspaceTable>;
 export type WorkspaceRow = { id: string; [key: string]: unknown };
@@ -17,7 +17,7 @@ function canonical(value: unknown): unknown {
   return value;
 }
 export const sameData = (left: unknown, right: unknown) => JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
-export const workspaceRows = (data: WorkspaceData, table: WorkspaceTable) => data[table] as unknown as WorkspaceRow[];
+export const workspaceRows = (data: WorkspaceData, table: WorkspaceTable) => (data[table] || []) as unknown as WorkspaceRow[];
 
 export function workspaceChanges(before: WorkspaceData, after: WorkspaceData): WorkspaceChange[] {
   return workspaceTables.flatMap(table => {
@@ -32,7 +32,7 @@ export class WorkspaceConflict extends Error {
 }
 
 export function applyWorkspaceChanges(current: WorkspaceData, changes: WorkspaceChange[]): WorkspaceData {
-  const result = structuredClone(current);
+  const result = { ...emptyWorkspace(), ...structuredClone(current) };
   for (const change of changes) {
     const rows = workspaceRows(result, change.table);
     const index = rows.findIndex(row => row.id === change.id);

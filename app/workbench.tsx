@@ -12,14 +12,15 @@ import RequestIndicator from './async-status';
 import { database, statuses, type Job, type JobStatus, type Project, type Source, type Task, type PreparationResult, type SavedResult, type PracticeSession } from '../lib/database';
 import { sampleJobs, sampleSources } from '../lib/samples';
 import JobImporter from './job-importer';
-import Projects from './projects';
+import MyInformation from './my-information';
+import type { PersonalProfile } from '../lib/personal-profile';
 import JobDetail from './job-detail';
 import Comparison from './comparison';
 import Practice, { PracticeSelector } from './practice';
 import DataBackup from './data-backup';
 import { saveTaskDone, recoverTaskChanges } from '../lib/task-storage';
 import { displayProjectText } from '../lib/client';
-import { deleteJob, restoreJob, type DeletedJob } from '../lib/job-storage';
+import { deleteJob, restoreJob, saveJobChanges, recoverJobNextActions, type DeletedJob } from '../lib/job-storage';
 import { Icon } from './ui';
 import { categoryFor } from '../lib/role-taxonomy';
 import { inputVersion } from '../lib/client';
@@ -27,7 +28,7 @@ import { needsRoleClassification, normalizeStoredHiringTypes } from '../lib/role
 import { useRoleClassification } from './use-role-classification';
 
 type Page = 'home' | 'jobs' | 'import' | 'detail' | 'projects' | 'compare' | 'interview' | 'scenario';
-const nav = [['home', '首页'], ['jobs', '岗位清单'], ['detail', '岗位详情'], ['projects', '我的项目'], ['compare', '岗位比较'], ['interview', '模拟面试'], ['scenario', '岗位体验']] as const;
+const nav = [['home', '首页'], ['jobs', '岗位清单'], ['detail', '岗位详情'], ['projects', '我的信息'], ['compare', '岗位比较'], ['interview', '模拟面试'], ['scenario', '岗位体验']] as const;
 function pageFromHash(hash: string): Page { return hash === 'categories' ? 'jobs' : [...nav.map(([key]) => key), 'import'].includes(hash) ? hash as Page : 'home'; }
 const journey = [{ title: '岗位解析', icon: 'globe' }, { title: '整理经历', icon: 'projects' }, { title: '面试准备', icon: 'interview' }, { title: '实战练习', icon: 'target' }];
 
@@ -35,6 +36,7 @@ export default function Workbench({ account, sync, onLogout }: { account: Accoun
   const saveStatus = useSyncExternalStore(sync.subscribe, sync.getStatus, sync.getStatus);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [profile, setProfile] = useState<PersonalProfile>();
   const [sources, setSources] = useState<Source[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [preparationCards, setPreparationCards] = useState<SavedResult<PreparationResult>[]>([]);
@@ -76,16 +78,17 @@ export default function Workbench({ account, sync, onLogout }: { account: Accoun
 
   async function refresh() {
     await normalizeStoredHiringTypes();
-    const [a, b, c, d, e, f, g, h] = await Promise.all([database.jobs.orderBy('updatedAt').reverse().toArray(), database.projects.toArray(), database.sources.toArray(), database.tasks.orderBy('order').toArray(), database.companies.toArray(), database.recommendations.toArray(), database.preparations.toArray(), database.practice.toArray()]);
+    const [a, b, c, d, e, f, g, h, info] = await Promise.all([database.jobs.orderBy('updatedAt').reverse().toArray(), database.projects.toArray(), database.sources.toArray(), database.tasks.orderBy('order').toArray(), database.companies.toArray(), database.recommendations.toArray(), database.preparations.toArray(), database.practice.toArray(), database.profiles.get('personal')]);
     setJobs(a); setProjects(b); setSources(c); setTasks(d.filter((task) => task.jobIds.some((id) => a.some((job) => job.id === id))));
     setPreparationCards(g); setPracticeRecords(h);
+    setProfile(info);
     setResearched([...new Set(e.filter((record) => record.data.research).map((record) => record.jobId))]);
     setMilestones(Object.fromEntries(a.map(job => {
       const jobSources = c.filter(source => source.jobId === job.id); const version = inputVersion(job, b.filter(project => project.confirmed), jobSources);
       return [job.id, [!!job.content.trim(), f.some(record => record.jobId === job.id && record.inputVersion === version && record.data.recommendations.length > 0), g.some(record => record.jobId === job.id && record.inputVersion === version), h.some(session => session.jobId === job.id && session.inputVersion === inputVersion(job, [], jobSources) && !!session.data.feedback)]];
     })));
   }
-  useEffect(() => { recoverTaskChanges().then(refresh).then(() => setReady(true)).catch(() => setError('无法读取已保存的资料，请检查浏览器是否允许保存网站数据。')); }, []);
+  useEffect(() => { recoverTaskChanges().then(recoverJobNextActions).then(refresh).then(() => setReady(true)).catch(() => setError('无法读取已保存的资料，请检查浏览器是否允许保存网站数据。')); }, []);
   const roleAnalysis = useRoleClassification(jobs, ready && !tutorial.step, refresh);
   useEffect(() => { const cleanHash = () => { if (window.location.hash === '#categories') window.history.replaceState(null, '', '#jobs'); }; const back = () => { cleanHash(); setPage(pageFromHash(window.location.hash.slice(1))); setEditing(null); window.scrollTo({ top: 0 }); }; cleanHash(); window.addEventListener('popstate', back); return () => window.removeEventListener('popstate', back); }, []);
   useEffect(() => { const changed = () => { void refresh(); }; window.addEventListener('jdtool-workspace-updated', changed); return () => window.removeEventListener('jdtool-workspace-updated', changed); }, []);
@@ -99,7 +102,7 @@ export default function Workbench({ account, sync, onLogout }: { account: Accoun
   function open(job: Job, stage: 'understand' | 'projects' | 'prepare' = 'understand') { chooseJob(job.id); setResumeProjects(false); setDetailStage(stage); navigate('detail'); }
   function continueStage(job: Job, index: number) { if (index === 3) { chooseJob(job.id); navigate('scenario'); } else open(job, (['understand', 'projects', 'prepare'] as const)[index]); }
   function edit(job: Job) { setEditing(job); chooseJob(job.id); window.history.pushState(null, '', '#import'); setPage('import'); window.scrollTo({ top: 0 }); }
-  async function update(job: Job, change: Partial<Job>) { await run(async () => { await database.jobs.update(job.id, { ...change, updatedAt: new Date().toISOString() }); await refresh(); }); }
+  async function update(job: Job, change: Partial<Job>) { await run(async () => { await saveJobChanges(job.id, change); await refresh(); }); }
   async function remove(job: Job) {
     if (!window.confirm(`删除“${job.company ? `${job.company} · ` : ''}${job.title}”？`)) return;
     await run(async () => { setDeleted(await deleteJob(job)); if (editing?.id === job.id) setEditing(null); await refresh(); });
@@ -163,7 +166,7 @@ export default function Workbench({ account, sync, onLogout }: { account: Accoun
           <div className="job-tags"><span className={`category-badge ${categoryFor(job).id === 'undetermined' ? 'pending' : ''}`}>{categoryFor(job).name}</span><span className="muted">{[job.location, job.hiringType].filter(Boolean).join(' · ')}</span>{job.warnings?.length ? <span className="tag">待核对或补充</span> : null}</div><ul className="job-priorities">{[...(job.requirements || []), ...(job.responsibilities || [])].slice(0, 2).map((item) => <li key={item.id}>{item.text}</li>)}</ul><div className="card-milestones" aria-label={`${job.title}准备进度`}>{journey.map((step, index) => <span key={step.title} className={milestones[job.id]?.[index] ? 'done' : ''} title={step.title}>{milestones[job.id]?.[index] ? <Icon name="check" size={12} /> : <span />}{step.title}</span>)}</div><label className="next-action">下一步行动<input key={`${job.id}-${job.nextAction}`} defaultValue={job.nextAction} maxLength={300} placeholder="记下一个可以完成的小步骤" onBlur={(event) => { if (event.target.value !== job.nextAction) void update(job, { nextAction: event.target.value }); }} /></label><div className="job-footer"><button className="card-open-button" onClick={() => open(job)}>继续准备 <Icon name="arrow" size={15} /></button><div><button className="text-button" onClick={() => edit(job)}>编辑</button><button className="text-button danger" onClick={() => remove(job)}>删除</button></div></div>
         </article>)])}</div></section></>}</div></div>}
       </div>}
-      {page === 'projects' && <>{resumeProjects && selected && <div className="context-banner"><span>正在为 {selected.company} · {selected.title} 整理经历</span><button className="text-button" onClick={() => navigate('detail')}>返回岗位继续准备 <Icon name="arrow" size={15} /></button></div>}<Projects allowSamples={account.role === 'admin'} projects={projects} refresh={refresh} onDeleted={() => setDeleted(null)} /></>}
+      {page === 'projects' && <>{resumeProjects && selected && <div className="context-banner"><span>正在为 {selected.company} · {selected.title} 整理经历</span><button className="text-button" onClick={() => navigate('detail')}>返回岗位继续准备 <Icon name="arrow" size={15} /></button></div>}<MyInformation profile={profile} beforeSaved={() => sync.flush()} allowSamples={account.role === 'admin'} projects={projects} refresh={refresh} onDeleted={() => setDeleted(null)} /></>}
       {page === 'detail' && !selected && <section className="panel empty"><h1>岗位详情</h1><button className="primary" onClick={() => navigate('import')}>添加我的第一个岗位</button></section>}
       {page === 'detail' && selected && <><label className="practice-selector">当前岗位<select aria-label="当前岗位" value={selected.id} onChange={event => { const job = jobs.find(row => row.id === event.target.value); if (job) open(job); }}>{jobs.map(job => <option key={job.id} value={job.id}>{job.company} · {job.title}</option>)}</select></label><button className="text-button back-button" onClick={() => navigate('jobs')}>返回岗位清单</button><JobDetail key={`${selected.id}-${detailStage}`} initialTab={resumeProjects ? 'projects' : detailStage} job={selected} projects={projects} sources={sources} refresh={refresh} onEdit={edit} onRecognize={job => void roleAnalysis.analyze([job], false)} onProjects={() => { setResumeProjects(true); navigate('projects'); }} onPractice={(mode, id) => { chooseJob(id); navigate(mode); }} addTask={addTask} /></>}
       {page === 'compare' && <Comparison jobs={jobs} projects={projects} sources={sources} addTask={addTask} ready={ready} />}

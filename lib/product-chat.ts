@@ -8,7 +8,7 @@ import { inputVersion } from './input-version';
 
 export const productChatInput = z.object({ question: z.string().trim().min(1).max(8000), history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(8000) })).max(12).default([]), page: z.string().max(80), jobId: z.string().max(300).optional(), excerpt: z.string().max(6000).optional() });
 const output = z.object({ answer: z.string().min(1).max(8000), suggestions: z.array(z.string().max(100)).max(3).default([]) });
-const guide = `产品用于求职准备。首页“我的准备”汇总待办、准备卡和练习复盘；新增JD支持岗位链接、截图或正文，校对后保存；岗位清单整理投递进度；岗位详情按“了解岗位与公司→准备项目→面试准备”操作；公司研究显示公开来源及待确认内容；“我的项目”录入并核对真实项目，已确认事实才能用于推荐；“准备项目”中点“AI推荐项目”生成简历要点、面试提纲及匹配度，核对采用后可复制；匹配度按当前JD职责与要求的覆盖情况计算，直接相关记1项、方法可迁移记半项，缺乏依据记0，不代表录用概率；岗位比较完成后单独显示结果，点“重新比较”调整选择；模拟面试先回答，再完成一次追问与复盘；岗位体验通过与同事私聊了解情况，提交方案后继续下一项任务，最后查看复盘；各分析内容可加入准备计划；长文本可语音输入；首页可重开新手教程；顶部资料备份可导出与恢复。`;
+const guide = `产品用于求职准备。首页“我的准备”汇总待办、准备卡和练习复盘；新增JD支持岗位链接、截图或正文，校对后保存；岗位清单整理投递进度；岗位详情按“了解岗位与公司→准备项目→面试准备”操作；公司研究显示公开来源及待确认内容；“我的信息”填写基本信息、教育经历和技能，并在“项目经历”录入并核对真实项目，已确认事实才能用于推荐；“准备项目”中点“AI推荐项目”生成简历要点、面试提纲及匹配度，核对采用后可复制；匹配度按当前JD职责与要求的覆盖情况计算，直接相关记1项、方法可迁移记半项，缺乏依据记0，不代表录用概率；岗位比较完成后单独显示结果，点“重新比较”调整选择；模拟面试先回答，再完成一次追问与复盘；岗位体验通过与同事私聊了解情况，提交方案后继续下一项任务，最后查看复盘；岗位的“下一步行动”保存后自动同步到首页待办；各分析内容可加入准备计划；长文本可语音输入；首页可重开新手教程；顶部资料备份可导出与恢复。`;
 
 export function productChatContext(workspace: WorkspaceData, jobId?: string) {
   const job = jobId ? workspace.jobs.find(item => item.id === jobId) : undefined;
@@ -21,6 +21,7 @@ export function productChatContext(workspace: WorkspaceData, jobId?: string) {
   const shorten = (value: unknown, limit = 9000) => displayProjectText(JSON.stringify(value || null), projects).slice(0, limit);
   return {
     productGuide: guide,
+    personalProfile: workspace.profiles?.[0] || null,
     job: job ? { title: job.title, company: job.company, content: job.content.slice(0, 10000), requirements: job.requirements, responsibilities: job.responsibilities, status: job.status, nextAction: job.nextAction } : null,
     recentJobs: job ? undefined : workspace.jobs.slice(0, 5).map(item => ({ title: item.title, company: item.company, status: item.status })),
     company: job ? shorten(latest(workspace.companies)?.data) : undefined,

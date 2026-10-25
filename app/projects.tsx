@@ -60,7 +60,7 @@ export default function Projects({ projects, refresh, onDeleted, onConfirmed, al
     });
   }
 
-  return <div className="page-stack"><div className="section-heading"><div><h1>我的项目</h1></div><button className="primary" onClick={() => setEditor(emptyProject())}>新增项目</button></div>
+  return <div className="page-stack"><div className="section-heading"><div><h2>项目经历</h2></div><button className="primary" onClick={() => setEditor(emptyProject())}>新增项目</button></div>
     {error && <div className="notice error" role="alert">{error}</div>}{message && <div className="notice" role="status">{message}</div>}
     {editor ? <section data-tour="project-import" className="panel"><div className="section-heading"><h2>核对项目事实</h2><button className="text-button" onClick={() => setEditor(null)}>取消</button></div><form onSubmit={save}>
       <div className="field-pair"><label>项目名称<input name="name" required defaultValue={editor.name} /></label><label>项目类型<input name="type" defaultValue={editor.type} placeholder="研究、工作、课程、个人项目等" /></label></div>
