@@ -7,6 +7,7 @@ h3 { font-size: 18px; line-height: 1.5; }
 .app-main .generated-project p, .app-main .builder-columns textarea,
 .app-main .colleague-message .colleague-bubble p, .app-main .my-action p, .app-main .work-impact p,
 .app-main .selection-card > span:last-child, .app-main .task-row label { font-size: var(--reading-size); line-height: 1.8; }
+.app-main .job-heading > select { flex-shrink: 0; width: 100px; max-width: 100%; height: 36px; padding: 6px 8px; font-size: 13px; line-height: 1.4; }
 .app-main .muted, .app-main .reference-label, .app-main .tag, .app-main .privacy-note,
 .app-main small, .app-main .source-domain, .app-main .source-domain span,
 .app-main .colleague-meta strong, .app-main .colleague-meta > span,
