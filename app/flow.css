@@ -22,6 +22,10 @@
 .project-import-card > summary::-webkit-details-marker { display: none; }
 .project-import-toggle { padding: 8px 13px; border: 1px solid #b7caef; border-radius: 9px; background: #eff4ff; color: #2452e8; white-space: nowrap; font-size: 14px; }
 .project-import-body { margin-top: 22px; }
+.project-match-summary { padding: 22px; margin: 24px 0; border: 1px solid #c9d8f3; border-radius: 14px; background: #f5f8ff; }
+.project-match-summary h3 { margin: 0; }.project-match-summary p { margin: 8px 0; }.project-match-overview { display: flex; justify-content: space-between; align-items: center; gap: 20px; }.project-match-score { color: #2452e8; font-size: 36px; white-space: nowrap; }.project-match-score > span { font-size: 20px; }.project-match-summary progress { width: 100%; height: 10px; accent-color: #2452e8; }.app-main .project-match-method { color: #5a7093; font-size: 14px; }.project-match-badge { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 5px 10px; margin: 8px 7px 8px 0; color: #355d9c; background: #edf3ff; border: 1px solid #c7d7f1; border-radius: 8px; font-size: 14px; }.project-match-badge strong { font-size: 20px; color: #2452e8; }
+.project-match-evidence { list-style: none; padding: 0; }.project-match-evidence li { padding: 16px 0; border-top: 1px solid #d5e0f1; }.project-match-evidence li > strong { display: block; margin: 7px 0; }.project-match-evidence p { color: #566b89; }.match-level { display: inline-block; font-size: 13px; color: #6a7790; }.match-level.direct { color: #2452e8; }.match-level.transferable { color: #357b71; }.builder-empty { padding: 18px; border: 1px dashed #bdcde8; border-radius: 10px; color: #5a6c87; background: #f8faff; }
+@media (max-width: 767px) { .project-match-summary { padding: 17px; }.project-match-overview { align-items: flex-start; gap: 12px; }.project-match-overview h3 { font-size: 18px; }.project-match-score { font-size: 30px; } }
 .home-hub { margin-top: 2px; }
 .home-hub > .section-heading { align-items: center; }
 .hub-filters { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 16px; margin: 22px 0; }

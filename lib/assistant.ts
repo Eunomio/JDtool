@@ -5,13 +5,14 @@ import { workplaceStyle } from './scenario-style';
 import { splitDialogue } from './dialogue';
 import { companyGuidance } from './company-guidance';
 import { practiceSources } from './practice-context';
+import { groundedCoverage } from './project-match';
 
 const ids = z.array(z.string().max(200)).max(100);
 const short = z.string().max(4000);
 const evidence = z.object({ text: short, reason: short, requirementIds: ids, factIds: ids, sourceIds: ids });
 const bullet = z.object({ text: short, factIds: ids });
 const recommendationOutput = z.object({
-  recommendations: z.array(z.object({ projectId: z.string(), rank: z.number(), role: z.enum(['primary', 'supporting']), matchType: z.enum(['direct', 'transferable', 'needs_more']), requirementIds: ids, factIds: ids, reason: short, resumeBullets: z.array(bullet).max(6), interviewOutline: z.array(bullet).max(8) })).max(3),
+  recommendations: z.array(z.object({ projectId: z.string(), rank: z.number(), role: z.enum(['primary', 'supporting']), matchType: z.enum(['direct', 'transferable', 'needs_more']), requirementIds: ids, factIds: ids, reason: short, resumeBullets: z.array(bullet).max(6), interviewOutline: z.array(bullet).max(8), coverage: z.array(z.object({ requirementId: z.string(), kind: z.enum(['direct', 'transferable']), factIds: ids })).max(80).optional() })).max(3),
   gaps: z.array(evidence).max(15), needsReview: z.array(short).max(30),
 });
 const projectOutput = z.object({ projects: z.array(z.object({
@@ -65,7 +66,7 @@ async function generate<T extends z.ZodType>(schema: T, prompt: string, input: A
   delete jsonSchema.$schema;
   const style = input.action === 'exercise' || input.action === 'scenario' ? `\n${workplaceStyle}${input.stage === 'dialogue' ? '\n本轮只回复用户向同事提出的问题，未提供的信息不要编造。consequence为空，feedback=null，不推进任务。' : input.stage === 'review' ? '\n复盘基于用户实际选择与提问，不评价性格，不把练习写成用户实际完成的工作。' : ''}` : '';
   const limit = input.action === 'exercise' ? input.mode === 'interview' ? 2200 : input.mode === 'scenario' ? 3800 : 6000 : input.action === 'interview' && input.stage === 'followup' ? 1000 : input.action === 'scenario' && input.stage !== 'review' ? 1400 : 6000;
-  const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, limit, false));
+  const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, input.action === 'recommendations' ? 9000 : limit, false, input.action === 'recommendations' ? 'complex' : 'standard'));
   if (!result.success) throw new AppError(502, 'INVALID_RESULT', '本次结果未完整生成，请重试。');
   const data = pruneReferences(result.data, input);
   if (input.action === 'exercise' && data && typeof data === 'object' && 'nodes' in data && Array.isArray(data.nodes)) {
@@ -105,7 +106,7 @@ export async function assist(input: AssistInput) {
   if (['recommendations', 'preparation', 'company', 'interview', 'scenario'].includes(input.action) && !input.job) throw new AppError(400, 'MISSING_JOB', '请先选择目标岗位。');
   if (input.action === 'recommendations') {
     if (!input.projects?.length) throw new AppError(400, 'MISSING_PROJECTS', '请先在我的项目中确认项目事实。');
-    const data = await generate(recommendationOutput, '按当前JD从确认的项目中通常选2个有明确关联的项目，最多3个并排序，恰好1个primary其余supporting。结合preference保留用户选择倾向，仍需解释与JD的关系。matchType=direct直接相关/transferable方法可迁移/needs_more需要补充。每个项目推荐以及每条resumeBullets、interviewOutline都附本人项目的factIds。每个项目给1—2条简历要点，面试提纲可用1—2段覆盖背景、我的行动、结果或当前进展、岗位关联。允许改变排序和侧重点，禁止更改原行业、本人角色、完成阶段，禁止把汽车项目改成做过穿戴项目；禁止新增未记录数字或成果。没有明确结果时保留当前进展，不能把做过评价框架写成优化了体验标准。阶段“构思/进行中”是合并标签，必须结合事实判断，事实明确进行中就不能写为构思。缺口放gaps，needsReview只列需要补充事实或核对的具体表述，不评价课程项目专业度或贬低任何项目。', input);
+    const data = await generate(recommendationOutput, '按当前JD从确认的项目中通常选2个有明确关联的项目，最多3个并排序，恰好1个primary其余supporting。结合preference保留用户选择倾向，仍需解释与JD的关系。matchType=direct直接相关/transferable方法可迁移/needs_more需要补充。每个项目推荐以及每条resumeBullets、interviewOutline都附本人项目的factIds。每个项目给1—2条简历要点，面试提纲可用1—2段覆盖背景、我的行动、结果或当前进展、岗位关联。允许改变排序和侧重点，禁止更改原行业、本人角色、完成阶段，禁止把汽车项目改成做过穿戴项目；禁止新增未记录数字或成果。没有明确结果时保留当前进展，不能把做过评价框架写成优化了体验标准。阶段“构思/进行中”是合并标签，必须结合事实判断，事实明确进行中就不能写为构思。缺口放gaps，needsReview只列需要补充事实或核对的具体表述，不评价课程项目专业度或贬低任何项目。' + '每个推荐项目必须输出coverage数组，逐项分析当前JD的requirements和responsibilities：direct表示有本人已确认事实直接支撑，transferable表示仅方法或经验可迁移，每项包含requirementId、kind、本人项目factIds；缺乏依据的要求不列入coverage。不得仅凭岗位名称、项目名称或一句相近表述认定满足技术、学历、年限、到岗等要求。简历要点与面试提纲各至少给一条有事实依据的表述。', input);
     const seen = new Set<string>();
     data.recommendations = data.recommendations.filter((recommendation) => {
       const project = input.projects!.find((project) => project.id === recommendation.projectId);
@@ -113,6 +114,7 @@ export async function assist(input: AssistInput) {
       seen.add(project.id);
       const allowed = new Set(project.facts.map((fact) => fact.id));
       recommendation.factIds = recommendation.factIds.filter((id) => allowed.has(id));
+      if (recommendation.coverage) recommendation.coverage = groundedCoverage(recommendation.coverage, input.job!, project);
       for (const key of ['resumeBullets', 'interviewOutline'] as const) recommendation[key] = recommendation[key].filter((bullet) => {
         const cited = project.facts.filter((fact) => bullet.factIds.includes(fact.id));
         bullet.factIds = cited.map((fact) => fact.id);
@@ -120,6 +122,7 @@ export async function assist(input: AssistInput) {
         if (!cited.length || numbers.some((number) => !cited.some((fact) => fact.text.includes(number)))) { data.needsReview.push(bullet.text); return false; }
         return true;
       });
+      recommendation.factIds = [...new Set([...recommendation.factIds, ...recommendation.resumeBullets.flatMap(item => item.factIds), ...recommendation.interviewOutline.flatMap(item => item.factIds)])];
       return recommendation.factIds.length > 0;
     }).slice(0, input.maxProjects || 3).map((item, index) => ({ ...item, rank: index + 1, role: index === 0 ? 'primary' : 'supporting' }));
     // Check the meaning of generated claims in addition to validating reference IDs.
@@ -141,6 +144,17 @@ export async function assist(input: AssistInput) {
         recommendation.resumeBullets = []; recommendation.interviewOutline = [];
       }
     }
+    for (const recommendation of data.recommendations) {
+      const project = input.projects!.find(item => item.id === recommendation.projectId)!;
+      const originals = project.facts.filter(fact => fact.text.trim()).slice(0, 3).map(fact => ({ text: fact.text, factIds: [fact.id] }));
+      if (!recommendation.resumeBullets.length || !recommendation.interviewOutline.length) {
+        if (!recommendation.resumeBullets.length) recommendation.resumeBullets = structuredClone(originals);
+        if (!recommendation.interviewOutline.length) recommendation.interviewOutline = structuredClone(originals);
+        data.needsReview.push(`${project.name}的部分表述沿用已核对的原始事实，可继续结合岗位要求调整。`);
+      }
+    }
+    data.recommendations = data.recommendations.filter(item => item.resumeBullets.length || item.interviewOutline.length);
+    if (!data.recommendations.length) throw new AppError(422, 'MISSING_FACTS', '没有找到可用于表述的项目事实，请先补充并核对真实经历。');
     data.needsReview = data.needsReview.map((text) => input.projects!.reduce((result, project) => result.replaceAll(project.id, project.name), text));
     return data;
   }

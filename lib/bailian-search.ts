@@ -1,10 +1,10 @@
 import { AppError } from './errors';
-import { bailianConfiguration } from './model-config';
+import { searchModelConfiguration } from './model-config';
 import { withModelCall } from './model';
 
 // Only provider search metadata supplies URLs. Assistant-generated links are never sources.
 export async function bailianSearch(query: string, signal: AbortSignal): Promise<unknown[]> {
-  const config = bailianConfiguration();
+  const config = searchModelConfiguration();
   const endpoint = `${config.base.replace(/\/compatible-mode\/v1$/, '')}/api/v1/services/aigc/multimodal-generation/generation`;
   return withModelCall(async (requestSignal) => {
     const response = await fetch(endpoint, {

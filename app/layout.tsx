@@ -7,6 +7,7 @@ import './onboarding.css';
 import './readability.css';
 import './flow.css';
 import './conversation.css';
+import './product-assistant.css';
 
 export const metadata: Metadata = {
   title: '岗位探索与求职准备助手',

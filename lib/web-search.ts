@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { AppError } from './errors';
 import { bailianSearch } from './bailian-search';
-import { bailianConfiguration } from './model-config';
+import { searchModelConfiguration } from './model-config';
 
 export type SearchHit = { title: string; url: string; snippet: string; publishedAt?: string; requiresReading?: boolean };
 const hit = z.object({ title: z.string().max(1000), url: z.string().max(4000), snippet: z.string().max(20000), publishedAt: z.string().max(200).optional(), requiresReading: z.literal(true).optional() });
@@ -10,7 +10,7 @@ export function searchConfiguration() {
   const provider = process.env.SEARCH_PROVIDER?.trim() || 'auto';
   if (['auto', 'bocha'].includes(provider) && process.env.BOCHA_API_KEY?.trim()) return { provider: 'bocha' as const, key: process.env.BOCHA_API_KEY.trim() };
   if (['auto', 'tavily'].includes(provider) && process.env.TAVILY_API_KEY?.trim()) return { provider: 'tavily' as const, key: process.env.TAVILY_API_KEY.trim() };
-  if (provider === 'bailian' || (provider === 'auto' && process.env.DASHSCOPE_API_KEY?.trim())) return bailianConfiguration();
+  if (provider === 'bailian' || (provider === 'auto' && process.env.DASHSCOPE_API_KEY?.trim())) return searchModelConfiguration();
   throw new AppError(503, 'SEARCH_UNAVAILABLE', '公司搜索暂时不可用。你可以先查看岗位、准备项目，也可补充公司官网资料后分析。');
 }
 

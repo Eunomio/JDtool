@@ -56,7 +56,7 @@ test('复盘缺少实际追问时在调用模型前拒绝请求', async ({ reque
   expect(response.status()).toBe(400); expect((await response.json()).error.code).toBe('MISSING_FOLLOWUP');
 });
 
-test('生成与事实核对共用截止时间，核对超时仍保存待核对草稿', async () => {
+test('生成与事实核对共用截止时间，核对超时用已确认原句补全表述', async () => {
   const restoreEnv = await isolateModel();
   const token = await createSession(await authenticateAccount('admin', 'admin'));
   const originalFetch = globalThis.fetch;
@@ -81,7 +81,8 @@ test('生成与事实核对共用截止时间，核对超时仍保存待核对�
     expect(upstreamCalls).toBe(2); expect(auditSignal?.aborted).toBe(true);
     expect(timers.filter((timer) => timer.milliseconds === 140_000)).toHaveLength(1);
     expect(timers.find((timer) => timer.milliseconds === 180_000)?.controller.signal.aborted).toBe(false);
-    expect(result.recommendations[0].resumeBullets).toEqual([]);
+    expect(result.recommendations[0].resumeBullets).toEqual([{ text: '实现事务处理', factIds: ['f1'] }]);
+    expect(result.recommendations[0].interviewOutline).toEqual([{ text: '实现事务处理', factIds: ['f1'] }]);
     expect(result.needsReview).toContain('实现事务处理（本次尚未完成事实核对）');
   } finally { globalThis.fetch = originalFetch; AbortSignal.timeout = originalTimeout; restoreEnv(); }
 });
@@ -211,8 +212,8 @@ test('岗位体验的真实调用提示包含工作沟通规范，提问不会�
   } finally { globalThis.fetch = originalFetch; restore(); }
 });
 
-test('百炼自动选择使用指定模型，显式指定服务时不会静默回退', () => {
-  expect(modelConfiguration({ DASHSCOPE_API_KEY: ' test-bailian ', CHAT_ECNU_API_KEY: 'test-ecnu' })).toMatchObject({ provider: 'bailian', key: 'test-bailian', model: 'qwen3.8-27b' });
+test('普通生成优先ChatECNU，显式指定服务时不会静默回退', () => {
+  expect(modelConfiguration({ DASHSCOPE_API_KEY: ' test-bailian ', CHAT_ECNU_API_KEY: 'test-ecnu' })).toMatchObject({ provider: 'chatecnu', key: 'test-ecnu', model: 'ecnu-plus' });
   expect(modelConfiguration({ DASHSCOPE_API_KEY: ' ', CHAT_ECNU_API_KEY: 'test-ecnu' }).provider).toBe('chatecnu');
   expect(modelConfiguration({ MODEL_PROVIDER: 'chatecnu', DASHSCOPE_API_KEY: 'test-bailian', CHAT_ECNU_API_KEY: 'test-ecnu' }).provider).toBe('chatecnu');
   expect(() => modelConfiguration({ MODEL_PROVIDER: 'bailian', CHAT_ECNU_API_KEY: 'test-ecnu' })).toThrow();

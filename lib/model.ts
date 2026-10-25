@@ -43,8 +43,13 @@ export async function withModelCall<T>(action: (signal: AbortSignal) => Promise<
   } finally { activeCalls--; }
 }
 
-export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true) {
+export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true, purpose: 'standard' | 'complex' = 'standard') {
   const config = modelConfiguration();
+  if (config.provider === 'chatecnu') {
+    const images = Array.isArray(content) && content.some(item => item.type === 'image_url');
+    if (images) config.model = process.env.CHAT_ECNU_VISION_MODEL?.trim() || 'ecnu-max';
+    else if (purpose === 'complex') config.model = process.env.CHAT_ECNU_COMPLEX_MODEL?.trim() || 'ecnu-max';
+  }
   const jsonSchema = config.provider === 'chatecnu' && constrained && !!schema;
   const instructions = `${system}${schema && !jsonSchema ? `\n严格遵循以下JSON Schema：${JSON.stringify(schema)}` : ''}\n只输出JSON，不要添加解释或代码围栏。`;
   return withModelCall(async (signal) => {

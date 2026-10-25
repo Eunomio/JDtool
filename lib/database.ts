@@ -43,7 +43,7 @@ export type Project = {
 };
 export type Advice = { text: string; reason: string; example?: string; requirementIds: string[]; factIds: string[]; sourceIds: string[]; sourceQuotes?: { sourceId: string; quote: string }[] };
 export type GeneratedBullet = { text: string; factIds: string[]; adopted?: boolean };
-export type Recommendation = { projectId: string; rank: number; role: 'primary' | 'supporting'; matchType: 'direct' | 'transferable' | 'needs_more'; requirementIds: string[]; factIds: string[]; reason: string; resumeBullets: GeneratedBullet[]; interviewOutline: GeneratedBullet[] };
+export type Recommendation = { projectId: string; rank: number; role: 'primary' | 'supporting'; matchType: 'direct' | 'transferable' | 'needs_more'; requirementIds: string[]; factIds: string[]; reason: string; resumeBullets: GeneratedBullet[]; interviewOutline: GeneratedBullet[]; coverage?: { requirementId: string; kind: 'direct' | 'transferable'; factIds: string[] }[] };
 export type RecommendationResult = { recommendations: Recommendation[]; gaps: Advice[]; needsReview: string[] };
 export type PreparationResult = { priorities: Advice[]; strengths: Advice[]; gaps: Advice[]; companyResearch: Advice[] };
 export type CompanyResult = { facts: Advice[]; hypotheses: Advice[]; questions: Advice[]; research?: { company: string; summary: string; identityNote: string; queries: string[]; searchedAt: string }; roleInsights?: Advice[]; businesses?: Advice[] };

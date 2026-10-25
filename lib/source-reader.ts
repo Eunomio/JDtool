@@ -121,22 +121,28 @@ async function renderedText(url: string) {
   } finally { await browser?.close().catch(() => {}); activeBrowsers--; }
 }
 
-export async function readSource(input: string, purpose: 'job' | 'general' = 'job') {
-  const { url } = await validatePublicUrl(input);
-  let text = '';
-  let resolvedUrl = url.href;
-  const jobId = /\/position\/(\d+)\//.exec(url.pathname)?.[1];
-  if (purpose === 'job' && jobId && (url.hostname.endsWith('.jobs.feishu.cn') || url.hostname === 'jobs.bytedance.com')) {
+export async function readPublicJob(url: URL, request: typeof publicRequest = publicRequest) {
+  const jobId = /\/position\/(\d+)(?:\/|$)/.exec(url.pathname)?.[1];
+  if (jobId && (url.hostname.endsWith('.jobs.feishu.cn') || url.hostname === 'jobs.bytedance.com')) {
     try {
-      const result = await publicRequest(`${url.origin}/api/v1/search/job/posts/${jobId}`);
+      const endpoint = url.hostname === 'jobs.bytedance.com' ? '/api/v1/job/posts/' : '/api/v1/search/job/posts/';
+      const result = await request(`${url.origin}${endpoint}${jobId}`, { Accept: 'application/json' });
       const payload = JSON.parse(result.body.toString('utf8'));
-      const job = payload.data?.job_post || payload.data?.job || payload.data;
-      if (result.status === 200 && job?.title && (job.description || job.requirement)) {
-        const raw = textFromHtml(`<html><body><h1>${job.title}</h1><p>岗位职责</p>${job.description || ''}<p>任职要求</p>${job.requirement || ''}<p>${JSON.stringify({ city: job.city_info, category: job.job_category, recruitmentType: job.recruitment_type, department: job.department_info })}</p></body></html>`);
+      const job = payload.data?.job_post_detail || payload.data?.job_post || payload.data?.job || payload.data;
+      if (result.status === 200 && (!payload.code || payload.code === 0) && (!job?.id || String(job.id) === jobId) && job?.title && (job.description || job.requirement)) {
+        const raw = textFromHtml(`<html><body><h1>${job.title}</h1><p>岗位职责</p>${job.description || ''}<p>任职要求</p>${job.requirement || ''}<p>${JSON.stringify({ city: job.city_list || job.city_info, category: job.job_category, recruitmentType: job.recruit_type || job.recruitment_type, department: job.department_info })}</p></body></html>`);
         return { text: raw, sourceUrl: url.href, collectedAt: new Date().toISOString(), method: 'public-job-data' };
       }
     } catch { /* Continue with the public page when its data endpoint is unavailable. */ }
   }
+  return null;
+}
+
+export async function readSource(input: string, purpose: 'job' | 'general' = 'job') {
+  const { url } = await validatePublicUrl(input);
+  let text = '';
+  let resolvedUrl = url.href;
+  if (purpose === 'job') { const known = await readPublicJob(url); if (known) return known; }
   try {
     const result = await publicRequest(url.href);
     resolvedUrl = result.url;

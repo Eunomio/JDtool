@@ -10,9 +10,13 @@ export function bailianConfiguration(env: Environment = process.env) {
 
 export function modelConfiguration(env: Environment = process.env) {
   const provider = env.MODEL_PROVIDER?.trim() || 'auto';
-  if (provider === 'bailian' || (provider === 'auto' && env.DASHSCOPE_API_KEY?.trim())) return bailianConfiguration(env);
+  if (provider === 'bailian' || (provider === 'auto' && !env.CHAT_ECNU_API_KEY?.trim() && env.DASHSCOPE_API_KEY?.trim())) return bailianConfiguration(env);
   if (!['auto', 'chatecnu'].includes(provider)) throw new AppError(503, 'MODEL_CONFIGURATION', '暂时无法处理，请稍后重试。输入内容已保留。');
   const key = env.CHAT_ECNU_API_KEY?.trim();
   if (!key) throw new AppError(503, 'MODEL_UNAVAILABLE', '暂时无法解析，请稍后重试。你也可以保留原文继续整理。');
   return { provider: 'chatecnu' as const, key, base: (env.CHAT_ECNU_BASE_URL?.trim() || 'https://chat.ecnu.edu.cn/open/api/v1').replace(/\/$/, ''), model: env.CHAT_ECNU_MODEL?.trim() || 'ecnu-plus' };
+}
+
+export function searchModelConfiguration(env: Environment = process.env) {
+  return { ...bailianConfiguration(env), model: env.DASHSCOPE_SEARCH_MODEL?.trim() || 'qwen3.7-flash' };
 }
