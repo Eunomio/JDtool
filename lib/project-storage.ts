@@ -37,13 +37,17 @@ export async function deleteProjects(projectId?: string) {
     const recommendations = (await database.recommendations.toArray()).filter((record) => affected(record) || record.data.recommendations.some((item) => item.projectId === projectId));
     const preparations = (await database.preparations.toArray()).filter(affected);
     const comparisons = (await database.comparisons.toArray()).filter(affected);
-    const texts = adviceTexts([preparations, comparisons]);
+    const affectedJobs = new Map<string, Set<string>>();
+    for (const record of [...preparations, ...comparisons]) for (const text of adviceTexts([record.data])) {
+      const jobs = affectedJobs.get(text) || new Set<string>();
+      record.jobId.split('|').forEach(id => jobs.add(id)); affectedJobs.set(text, jobs);
+    }
     if (projectId) await database.projects.delete(projectId);
     else await database.projects.clear();
     await database.recommendations.bulkDelete(recommendations.map((record) => record.id));
     await database.preparations.bulkDelete(preparations.map((record) => record.id));
     await database.comparisons.bulkDelete(comparisons.map((record) => record.id));
-    await database.tasks.filter((task) => texts.has(task.text)).delete();
+    await database.tasks.filter(task => task.jobIds.some(id => affectedJobs.get(task.text)?.has(id))).delete();
   });
 }
 

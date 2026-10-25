@@ -19,7 +19,7 @@ export async function bailianSearch(query: string, signal: AbortSignal): Promise
     const unavailable = () => new AppError(response.status === 429 ? 429 : 502, 'SEARCH_UNAVAILABLE', '这次搜索未完成，请稍后重试。已保存的岗位与资料可以继续使用。');
     if (!response.ok || !response.body) { await response.body?.cancel(); throw unavailable(); }
     const reader = response.body.getReader(); const decoder = new TextDecoder();
-    let pending = ''; let size = 0; const rows: unknown[] = [];
+    let pending = ''; let size = 0; const rows = new Map<string, Record<string, unknown>>();
     function frame(value: string) {
       const data = value.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trimStart()).join('\n');
       if (!data || data === '[DONE]') return;
@@ -27,7 +27,9 @@ export async function bailianSearch(query: string, signal: AbortSignal): Promise
       try { event = JSON.parse(data); } catch { throw unavailable(); }
       if (event.code || event.error) throw unavailable();
       const results = event.output?.search_info?.search_results;
-      if (Array.isArray(results)) rows.push(...results.slice(0, 12));
+      if (Array.isArray(results)) for (const result of results.slice(0, 12)) {
+        if (result && typeof result === 'object' && typeof result.url === 'string' && (rows.has(result.url) || rows.size < 24)) rows.set(result.url, result);
+      }
     }
     try {
       while (true) {
@@ -46,10 +48,6 @@ export async function bailianSearch(query: string, signal: AbortSignal): Promise
       }
       if (pending.trim()) frame(pending.replace(/\r\n/g, '\n'));
     } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
-    return rows.slice(0, 24).flatMap((row) => {
-      if (!row || typeof row !== 'object') return [];
-      const item = row as Record<string, unknown>;
-      return [{ title: item.title, url: item.url, snippet: '', requiresReading: true }];
-    });
+    return [...rows.values()].map(item => ({ title: item.title, url: item.url, snippet: '', requiresReading: true }));
   }, AbortSignal.any([signal, AbortSignal.timeout(45000)]));
 }

@@ -74,7 +74,9 @@ export async function restoreBackup(data: Backup) {
     });
     for (const record of data.recommendations) for (const item of record.data.recommendations) {
       const project = projects.get(item.projectId);
-      for (const bullet of [...item.resumeBullets, ...item.interviewOutline]) if (!project?.confirmed || !bullet.factIds.length || !bullet.factIds.every((id) => project.facts.some((fact) => fact.id === id))) bullet.adopted = false;
+      // shortcut: legacy backups have no project version; use fact IDs until versionless imports are retired.
+      const sameVersion = !record.projectVersions || record.projectVersions.some(version => version.id === item.projectId && version.updatedAt === project?.updatedAt);
+      for (const bullet of [...item.resumeBullets, ...item.interviewOutline]) if (!sameVersion || !project?.confirmed || !bullet.factIds.length || !bullet.factIds.every((id) => project.facts.some((fact) => fact.id === id))) bullet.adopted = false;
     }
     for (const table of tables) if (data[table].length) await database.table(table).bulkPut(data[table]);
   });

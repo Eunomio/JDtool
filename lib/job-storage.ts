@@ -10,11 +10,12 @@ async function syncNextAction(job: Job, text: string, recovering = false) {
   if (!text) { if (linked?.origin === 'job-next-action' && !linked.done) await database.tasks.delete(linked.id);return undefined; }
   if (linked && job.nextAction.trim() === text) return linked.id;
   if (linked?.origin === 'job-next-action' && !linked.done) { await database.tasks.update(linked.id, { text });return linked.id; }
-  const duplicate = tasks.find(task => !task.done && task.text === text && task.jobIds.length === 1 && task.jobIds[0] === job.id);
+  const sameAction = tasks.filter(task => task.text === text && task.jobIds.length === 1 && task.jobIds[0] === job.id);
+  const duplicate = sameAction.find(task => !task.done) || (recovering ? sameAction[0] : undefined);
   if (duplicate) return duplicate.id;
   let hash = 2166136261;for (let index = 0;index < job.id.length;index++) hash = Math.imul(hash ^ job.id.charCodeAt(index),16777619);
   const recoveryId = recovering ? `job-action-${job.id.slice(0,220)}-${(hash >>> 0).toString(16)}` : undefined;
-  const task: Task = { id: recoveryId || crypto.randomUUID(), text, jobIds: [job.id], done: false, order: tasks.length ? Math.max(...tasks.map(item => item.order)) + 1 : 0, createdAt: recovering ? job.updatedAt : new Date().toISOString(), origin: 'job-next-action' };
+  const task: Task = { id: recoveryId && !tasks.some(task => task.id === recoveryId) ? recoveryId : crypto.randomUUID(), text, jobIds: [job.id], done: false, order: tasks.length ? Math.max(...tasks.map(item => item.order)) + 1 : 0, createdAt: recovering ? job.updatedAt : new Date().toISOString(), origin: 'job-next-action' };
   await database.tasks.put(task);return task.id;
 }
 
