@@ -124,7 +124,11 @@ test('计划按钮显示成功反馈，重新生成后新建议可加入，完�
   await page.getByRole('button', { name: '加入我的计划', exact: true }).click();
   await expect(page.getByRole('button', { name: '已加入计划', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '岗位清单', exact: true }).click();
-  await expect(page.getByRole('checkbox')).toHaveCount(2); await page.getByRole('checkbox').first().check();
+  await expect(page.getByRole('checkbox')).toHaveCount(2);
+  const completedTask = page.getByRole('checkbox', { name: /梳理一次企业协作访谈/ });
+  await completedTask.click(); await expect(completedTask).toBeChecked();
   await expect(page.locator('.plan-progress progress')).toHaveAttribute('value', '1');
   await expect(page.getByText('又完成一项准备，下一步更有把握。', { exact: true })).toBeVisible();
+  await page.reload(); await expect(completedTask).toBeChecked();
+  await expect(page.locator('.plan-progress progress')).toHaveAttribute('value', '1');
 });
