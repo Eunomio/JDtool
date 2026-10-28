@@ -55,6 +55,7 @@
 .home-progress > summary { padding: 15px 18px; border: 1px solid #c9d8f2; border-radius: 12px; background: white; color: #34558a; font-size: 16px; }
 .home-progress > .page-stack { margin-top: 18px; }
 .async-status { position: relative; display: flex; gap: 15px; align-items: center; overflow: hidden; padding: 18px 20px; background: #f1f5ff; border: 1px solid #b7caf4; border-radius: 13px; color: #284879; }
+.import-start form > .actions + .async-status, .builder > .text-button + .notice { margin-top: 20px; }
 .async-status-copy { flex: 1; min-width: 0; }.async-status-copy strong { display: block; font-size: 15px; }.async-status-copy .async-elapsed { display: block; margin-top: 4px; font-size: 13px; color: #5b7299; }
 .async-status-copy p { margin: 8px 0 0; font-size: 14px; }
 .async-spinner { display: inline-block; width: 25px; height: 25px; flex-shrink: 0; border: 3px solid #bdd0fc; border-top-color: #2452e8; border-right-color: #2452e8; border-radius: 50%; animation: async-spin .85s linear infinite; }

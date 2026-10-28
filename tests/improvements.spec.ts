@@ -3,7 +3,24 @@ const now = '2026-10-25T08:00:00.000Z';
 const job = { id:'improve-job',title:'产品经理',company:'星桥协作',content:'负责用户访谈、需求分析及产品方案验证。',requirements:[{id:'improve-r1',text:'开展用户访谈',sourceText:'开展用户访谈'},{id:'improve-r2',text:'安排产品方案验证',sourceText:'安排产品方案验证'}],responsibilities:[],status:'关注中',nextAction:'',createdAt:now,updatedAt:now };
 const project = { id:'improve-project',name:'活动报名工具',type:'课程项目',stage:'已测试',timeline:'',role:'产品设计',problem:'',actions:'',methods:'',results:'',skills:[],facts:[{id:'improve-f1',text:'访谈活动参与者并整理报名问题',sourceText:'访谈活动参与者并整理报名问题',category:'action'}],sources:[],confirmed:true,visibility:'private',redactions:[],updatedAt:now };
 const recommendation = { projectId:project.id,rank:1,role:'primary',matchType:'direct',requirementIds:['improve-r1'],factIds:['improve-f1'],reason:'有用户访谈事实支撑',resumeBullets:[{text:'访谈活动参与者并整理报名问题',factIds:['improve-f1']}],interviewOutline:[{text:'说明访谈过程与发现的问题',factIds:['improve-f1']}],coverage:[{requirementId:'improve-r1',kind:'direct',factIds:['improve-f1']},{requirementId:'improve-r2',kind:'transferable',factIds:['improve-f1']}] };
-async function seed(page:Page, extraProjects:unknown[] = []) { await page.goto('/'); await expect(page.getByRole('button',{name:'体验6个示例岗位'})).toBeEnabled(); await page.getByText('资料备份',{exact:true}).click(); page.once('dialog',dialog=>dialog.accept()); await page.getByLabel('选择备份文件',{exact:true}).setInputFiles({name:'improve.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({format:'jdtool-backup',version:2,jobs:[job],projects:[project,...extraProjects]}))}); await expect(page.getByText('备份已恢复。',{exact:true})).toBeVisible(); await page.getByText('资料备份',{exact:true}).click(); }
+async function seed(page:Page, extraProjects:unknown[] = [], inputJob = job) { await page.goto('/'); await expect(page.getByRole('button',{name:'体验6个示例岗位'})).toBeEnabled(); await page.getByText('资料备份',{exact:true}).click(); page.once('dialog',dialog=>dialog.accept()); await page.getByLabel('选择备份文件',{exact:true}).setInputFiles({name:'improve.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({format:'jdtool-backup',version:2,jobs:[inputJob],projects:[project,...extraProjects]}))}); await expect(page.getByText('备份已恢复。',{exact:true})).toBeVisible(); await page.getByText('资料备份',{exact:true}).click(); }
+
+test('JD要求不重复显示相同摘要和原句，不同原句作为补充保留', async ({ page }) => {
+  const requirements = [
+    { id: 'same', text: '开展用户访谈', sourceText: '开展用户访谈' },
+    { id: 'spaced', text: '整理需求清单', sourceText: ' 整理需求\n清单 ' },
+    { id: 'missing', text: '验证产品方案', sourceText: '' },
+    { id: 'different', text: '安排产品走查', sourceText: '负责组织产品走查，整理使用问题并跟踪改进。' },
+  ];
+  await seed(page, [], { ...job, requirements });
+  await page.getByRole('button', { name: job.title, exact: true }).click();
+  await page.getByRole('tab', { name: /准备项目/ }).click();
+  const items = page.locator('.builder-columns > div').first().locator('blockquote');
+  await expect(items).toHaveCount(4);
+  for (let index = 0; index < 3; index++) { await expect(items.nth(index).getByText(requirements[index].text, { exact: true })).toHaveCount(1); await expect(items.nth(index).locator('p')).toHaveCount(0); }
+  await expect(items.last().locator('strong')).toHaveText(requirements[3].text);
+  await expect(items.last().locator('p')).toHaveText('JD原文：' + requirements[3].sourceText);
+});
 
 test('项目生成后显示百分比与逐项依据，表述可用，刷新和备份保留匹配结果',async({page})=>{
   let empty=true;await page.route('**/api/project-recommendations',route=>{const data={recommendations:[empty?{...recommendation,resumeBullets:[],interviewOutline:[]}:recommendation],gaps:[],needsReview:[]};empty=false;return route.fulfill({json:data});});

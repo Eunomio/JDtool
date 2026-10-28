@@ -15,6 +15,8 @@ h3 { font-size: 18px; line-height: 1.5; }
 .app-main .generated-bullet .inline, .app-main .tutorial-case-banner { font-size: var(--supporting-size); line-height: 1.7; }
 .app-main .muted, .app-main .reference-label, .app-main .privacy-note { color: #586983; }
 .app-main button, .app-main summary, .app-main label, .app-main legend { font-size: var(--supporting-size); }
+.app-main .job-grid > .group-heading { font-size: 18px; font-weight: 650; color: #34558a; letter-spacing: 0; }
+.app-main .job-heading .title-button { font-size: 18px; line-height: 1.5; }
 .app-main .section-heading h2, .app-main .job-requirements h2 { font-size: 22px; }
 .app-main .advice-section h3, .app-main .builder-columns > div > h3,
 .app-main .generated-project h4, .app-main .question-card h2 { font-size: 18px; }
