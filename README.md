@@ -80,7 +80,7 @@ node scripts/modelscope.mjs info JDtool
 
 `probe` 只读取账号名称与Docker可用规格。`create` 仅选择明确标记免费的CPU资源并创建私有创空间，`deploy` 触发已有免费空间部署。后两项会修改远程资源。
 
-当前分工：普通文字解析、公司资料分析与聊天使用 ChatECNU `ecnu-plus`；复杂项目分析和截图、扫描件识别使用已验证的 `ecnu-max`；联网检索使用百炼 `qwen3.7-flash` 的独立模型额度。两类密钥均保存在服务端：
+当前分工：普通文字解析与聊天使用 ChatECNU `ecnu-plus`；公司资料分析、复杂项目分析和截图、扫描件识别使用 `ecnu-max`；联网检索使用百炼 `qwen3.8-flash` 的独立模型额度。两类密钥均保存在服务端：
 
 ```dotenv
 MODEL_PROVIDER=chatecnu
@@ -90,10 +90,12 @@ CHAT_ECNU_COMPLEX_MODEL=ecnu-max
 CHAT_ECNU_VISION_MODEL=ecnu-max
 SEARCH_PROVIDER=bailian
 DASHSCOPE_API_KEY=填入你的百炼APIKey
-DASHSCOPE_SEARCH_MODEL=qwen3.7-flash
+DASHSCOPE_SEARCH_MODEL=qwen3.8-flash
 ```
 
 `MODEL_PROVIDER=auto` 优先选择已配置的ChatECNU；仅配置百炼时保留通用兼容方式，也可显式指定服务。当前部署显式使用ChatECNU处理非联网生成。搜索不跟随通用模型切换，单独读取 `DASHSCOPE_SEARCH_MODEL`；失败不自动转用其他模型或付费服务。
+
+公司研究等待期间每15秒返回一次保活消息，避免部署平台因长时间无数据而中断连接。分析使用与岗位及公司业务相关的原文摘录，完整来源仍保留供核对；单次分析等待超过50秒或结果格式不完整时最多重试一次，沿用整体140秒截止时间，取消或额度用尽不重试。分析失败后可以直接分析已保存资料，无需重新搜索。
 
 百炼原生联网搜索复用同一 Key，无需额外搜索账号。`SEARCH_PROVIDER=auto` 按博查、Tavily、百炼顺序选择已配置的服务，也可指定 `bailian`、`bocha`、`tavily`。百炼采用多模态流式接口与 `turbo` 策略，每次公司研究最多两次搜索请求；只使用接口返回的搜索来源链接，实际读取网页后才分析，无法读取的标题不会被当作业务事实。原生搜索调用同样计入应用每日调用上限和并发上限。参考[百炼联网搜索文档](https://help.aliyun.com/zh/model-studio/web-search)和[结构化输出文档](https://help.aliyun.com/zh/model-studio/qwen-structured-output)。
 

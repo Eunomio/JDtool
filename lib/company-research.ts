@@ -6,11 +6,13 @@ import { publicRequest, textFromHtml, validatePublicUrl } from './source-reader'
 import { normalizeHits, searchConfiguration, webSearch, type SearchHit } from './web-search';
 import type { Advice, CompanyResult, Source } from './database';
 import { companyAnalysisPrompt } from './company-guidance';
+import { companySources } from './company-context';
+import { retryCompanyAnalysis } from './company-analysis';
 
 const reference = z.object({ id: z.string().max(200), text: z.string().max(4000) });
 export const researchInput = z.object({ job: z.object({ id: z.string().min(1).max(200), company: z.string().trim().min(1).max(200), title: z.string().max(200), direction: z.string().max(200).optional(), responsibilities: z.array(reference).max(40).optional(), requirements: z.array(reference).max(40).optional() }) });
 type ResearchInput = z.infer<typeof researchInput>;
-export type ResearchEvent = { type: 'progress'; stage: 'planning' | 'searching' | 'reading' | 'analyzing'; message: string; queries?: string[] } | { type: 'sources'; sources: Source[] } | { type: 'result'; data: CompanyResult } | { type: 'error'; message: string };
+export type ResearchEvent = { type: 'progress'; stage: 'planning' | 'searching' | 'reading' | 'analyzing'; message: string; queries?: string[] } | { type: 'sources'; sources: Source[] } | { type: 'result'; data: CompanyResult } | { type: 'error'; message: string } | { type: 'heartbeat' };
 const item = z.object({ text: z.string().max(1200), reason: z.string().max(1000), example: z.string().max(1200).optional(), requirementIds: z.array(z.string()).max(10), sourceIds: z.array(z.string()).max(10), quotes: z.array(z.object({ sourceId: z.string(), quote: z.string().trim().min(8).max(1000) })).max(5) });
 const output = z.object({ identityNote: z.string().max(1200), identityMatched: z.boolean(), facts: z.array(item).max(6), businesses: z.array(item).max(6), roleInsights: z.array(item).max(6), hypotheses: z.array(item).max(4), questions: z.array(item).max(5) });
 
@@ -80,9 +82,12 @@ export async function researchCompany(input: ResearchInput, emit: (event: Resear
   if (!sources.length) throw new AppError(422, 'NO_PUBLIC_SOURCES', '没有找到可读取的公开资料，请补充公司官网后重试。');
   emit({ type: 'sources', sources });
   progress('analyzing', '正在把公司业务与岗位职责逐项关联', queries);
-  const response = output.safeParse(await dependencies.json(companyAnalysisPrompt, JSON.stringify({ job: input.job, sources }), z.toJSONSchema(output), 6500, false));
-  if (!response.success) throw new AppError(502, 'INVALID_RESEARCH', '资料已保存，业务分析尚未完成，请重试。');
-  const data = groundResearch(response.data, input, sources);
+  const analysis = await retryCompanyAnalysis(signal, async (attemptSignal) => {
+    const response = output.safeParse(await dependencies.json(companyAnalysisPrompt, JSON.stringify({ job: input.job, sources: companySources(input.job, sources) }), z.toJSONSchema(output), 6500, false, 'complex', attemptSignal));
+    if (!response.success) throw new AppError(502, 'INVALID_RESEARCH', '资料已保存，业务分析尚未完成，请重试。');
+    return response.data;
+  }, () => progress('analyzing', '分析等待较久或结果未完整返回，正在重新尝试，已找到的资料会保留', queries));
+  const data = groundResearch(analysis, input, sources);
   data.research!.queries = queries;
   emit({ type: 'result', data });
   return { sources, data };

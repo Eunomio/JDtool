@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { AppError } from './errors';
-import { modelJson } from './model';
+import { modelJson, modelRequestSignal } from './model';
 import { workplaceStyle } from './scenario-style';
 import { splitDialogue } from './dialogue';
 import { companyGuidance } from './company-guidance';
+import { companySources } from './company-context';
+import { retryCompanyAnalysis } from './company-analysis';
 import { practiceSources } from './practice-context';
 import { groundedCoverage } from './project-match';
 
@@ -66,9 +68,13 @@ async function generate<T extends z.ZodType>(schema: T, prompt: string, input: A
   delete jsonSchema.$schema;
   const style = input.action === 'exercise' || input.action === 'scenario' ? `\n${workplaceStyle}${input.stage === 'dialogue' ? '\n本轮只回复用户向同事提出的问题，未提供的信息不要编造。consequence为空，feedback=null，不推进任务。' : input.stage === 'review' ? '\n复盘基于用户实际选择与提问，不评价性格，不把练习写成用户实际完成的工作。' : ''}` : '';
   const limit = input.action === 'exercise' ? input.mode === 'interview' ? 2200 : input.mode === 'scenario' ? 3800 : 6000 : input.action === 'interview' && input.stage === 'followup' ? 1000 : input.action === 'scenario' && input.stage !== 'review' ? 1400 : 6000;
-  const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, input.action === 'recommendations' ? 9000 : limit, false, input.action === 'recommendations' ? 'complex' : 'standard'));
-  if (!result.success) throw new AppError(502, 'INVALID_RESULT', '本次结果未完整生成，请重试。');
-  const data = pruneReferences(result.data, input);
+  const request = async (signal?: AbortSignal) => {
+    const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, input.action === 'recommendations' ? 9000 : limit, false, ['recommendations', 'company'].includes(input.action) ? 'complex' : 'standard', signal));
+    if (!result.success) throw new AppError(502, 'INVALID_RESULT', '本次结果未完整生成，请重试。');
+    return result.data;
+  };
+  const parsed = input.action === 'company' ? await retryCompanyAnalysis(modelRequestSignal() || AbortSignal.timeout(140000), request) : await request();
+  const data = pruneReferences(parsed, input);
   if (input.action === 'exercise' && data && typeof data === 'object' && 'nodes' in data && Array.isArray(data.nodes)) {
     for (const node of data.nodes) node.situation = splitDialogue(node.situation, node.colleague).content;
   }
@@ -160,7 +166,7 @@ export async function assist(input: AssistInput) {
   }
   if (input.action === 'preparation') return generate(preparationOutput, '生成四栏岗位准备卡：priorities岗位看重什么、strengths我能讲什么、gaps还需补什么、companyResearch面试前了解什么。按优先级排序，每项写具体行动与理由，至少引用一项JD要求、项目事实或公司来源。缺失经历表述为需要补充；未上传简历时提供通用准备行动，不假设个人有经历。', input);
   if (input.action === 'company') {
-    const data = await generate(companyOutput, `facts只列给定公司公开资料已确认且与岗位有关的信息，每条必须引用sourceIds；businesses列主要产品、服务对象与业务场景；roleInsights关联JD职责给出准备建议，同时引用requirementIds和sourceIds；hypotheses列待确认的业务方向，说明依据与不确定点；questions列面试中可确认的问题。每条举例都在sourceQuotes中逐字引用对应来源原句，覆盖例子中的具体数据。${companyGuidance}`, input);
+    const data = await generate(companyOutput, `facts只列给定公司公开资料已确认且与岗位有关的信息，每条必须引用sourceIds；businesses列主要产品、服务对象与业务场景；roleInsights关联JD职责给出准备建议，同时引用requirementIds和sourceIds；hypotheses列待确认的业务方向，说明依据与不确定点；questions列面试中可确认的问题。每条举例都在sourceQuotes中逐字引用对应来源原句，覆盖例子中的具体数据。${companyGuidance}`, { ...input, sources: companySources(input.job!, input.sources || []) });
     data.facts = data.facts.filter((item) => item.sourceIds.length);
     data.businesses = data.businesses?.filter(item => item.sourceIds.length);
     data.roleInsights = data.roleInsights?.filter(item => item.sourceIds.length && item.requirementIds.length);

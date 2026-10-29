@@ -18,5 +18,5 @@ export function modelConfiguration(env: Environment = process.env) {
 }
 
 export function searchModelConfiguration(env: Environment = process.env) {
-  return { ...bailianConfiguration(env), model: env.DASHSCOPE_SEARCH_MODEL?.trim() || 'qwen3.7-flash' };
+  return { ...bailianConfiguration(env), model: env.DASHSCOPE_SEARCH_MODEL?.trim() || 'qwen3.8-flash' };
 }

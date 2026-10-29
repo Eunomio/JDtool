@@ -18,7 +18,7 @@ test('五个内容页签分别展示，举例按需展开，切换不重复研�
   let calls = 0;
   const example = '公开产品资料中的协作场景，可用于讨论需求优先级与验证方法。';
   const detailed = { ...result, roleInsights: [{ ...advice, text: '梳理需求优先级与验证方法', example, sourceQuotes: [{ sourceId: source.id, quote: source.text }] }], hypotheses: [{ ...advice, text: '当前岗位具体负责的客户群仍需确认' }] };
-  await page.route('**/api/company/research', route => { calls++; return route.fulfill({ contentType: 'application/x-ndjson', body: stream([{ type: 'sources', sources: [source] }, { type: 'result', data: detailed }]) }); });
+  await page.route('**/api/company/research', route => { calls++; return route.fulfill({ contentType: 'application/x-ndjson', body: stream([{ type: 'heartbeat' }, { type: 'sources', sources: [source] }, { type: 'heartbeat' }, { type: 'result', data: detailed }, { type: 'heartbeat' }]) }); });
   await seed(page); await page.getByRole('button', { name: job.title, exact: true }).click();
   await expect(page.getByRole('tab', { name: '岗位要求', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: '这个岗位要解决什么', exact: true })).toBeVisible();

@@ -6,7 +6,7 @@ export async function streamResearch(job: unknown, signal: AbortSignal, onEvent:
   if (!response.ok) { const data = await response.json().catch(() => null); throw new Error(data?.error?.message || '这次搜索尚未完成，请稍后重试。'); }
   if (!response.body) throw new Error('没有读到公司资料，请重试。');
   const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''; let complete = false; let total = 0;
-  async function consume(line: string) { if (!line.trim()) return; const event = JSON.parse(line) as ResearchEvent; if (event.type === 'error') throw new Error(event.message); await onEvent(event); if (event.type === 'result') complete = true; }
+  async function consume(line: string) { if (!line.trim()) return; const event = JSON.parse(line) as ResearchEvent; if (event.type === 'heartbeat') return; if (event.type === 'error') throw new Error(event.message); await onEvent(event); if (event.type === 'result') complete = true; }
   try {
     while (true) {
       const { done, value } = await reader.read();

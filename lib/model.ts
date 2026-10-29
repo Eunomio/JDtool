@@ -43,7 +43,7 @@ export async function withModelCall<T>(action: (signal: AbortSignal) => Promise<
   } finally { activeCalls--; }
 }
 
-export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true, purpose: 'standard' | 'complex' = 'standard') {
+export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true, purpose: 'standard' | 'complex' = 'standard', externalSignal?: AbortSignal) {
   const config = modelConfiguration();
   if (config.provider === 'chatecnu') {
     const images = Array.isArray(content) && content.some(item => item.type === 'image_url');
@@ -69,5 +69,5 @@ export async function modelJson(system: string, content: Content, schema?: Recor
     if (typeof result !== 'string') throw new AppError(502, 'INVALID_RESULT', '没有得到完整结果，请重试。');
     try { return JSON.parse(result.replace(/^```(?:json)?\s*|\s*```$/g, '')); }
     catch { throw new AppError(502, 'INVALID_RESULT', '解析结果不完整，请重试。'); }
-  });
+  }, externalSignal);
 }

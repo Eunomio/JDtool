@@ -29,7 +29,7 @@ test('字节岗位详情使用新的公开接口，只读取指定岗位，不�
 
 test('搜索模型额度独立于普通生成，默认路由遵循ChatECNU与百炼分工',()=>{
   const env={CHAT_ECNU_API_KEY:'test-ecnu',DASHSCOPE_API_KEY:'test-bailian',DASHSCOPE_MODEL:'exhausted-model'};
-  expect(modelConfiguration(env)).toMatchObject({provider:'chatecnu',model:'ecnu-plus'}); expect(searchModelConfiguration(env)).toMatchObject({provider:'bailian',model:'qwen3.7-flash'});
+  expect(modelConfiguration(env)).toMatchObject({provider:'chatecnu',model:'ecnu-plus'}); expect(searchModelConfiguration(env)).toMatchObject({provider:'bailian',model:'qwen3.8-flash'});
   expect(searchModelConfiguration({...env,DASHSCOPE_SEARCH_MODEL:'selected-search-model'}).model).toBe('selected-search-model');
 });
 
