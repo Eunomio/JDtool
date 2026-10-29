@@ -280,7 +280,7 @@ test('百炼流内错误不泄露响应正文，取消后不发送请求', async
   const restore = setEnvironment({ SEARCH_PROVIDER: 'bailian', DASHSCOPE_API_KEY: 'test-only-bailian', DASHSCOPE_BASE_URL: 'https://bailian.test.invalid/compatible-mode/v1' }); let calls = 0;
   try {
     globalThis.fetch = async () => { calls++; return new Response('data:{"code":"InvalidApiKey","message":"test-only-bailian sensitive"}\n\n'); };
-    await expect(webSearch('云帆科技', new AbortController().signal)).rejects.toThrow('这次搜索未完成');
+    await expect(webSearch('云帆科技', new AbortController().signal)).rejects.toThrow('搜索服务配置暂不可用');
     const controller = new AbortController(); controller.abort();
     await expect(webSearch('云帆科技', controller.signal)).rejects.toThrow(); expect(calls).toBe(1);
   } finally { globalThis.fetch = originalFetch; restore(); restoreModel(); }
