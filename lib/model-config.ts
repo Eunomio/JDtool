@@ -20,3 +20,8 @@ export function modelConfiguration(env: Environment = process.env) {
 export function searchModelConfiguration(env: Environment = process.env) {
   return { ...bailianConfiguration(env), model: env.DASHSCOPE_SEARCH_MODEL?.trim() || 'qwen3.8-flash' };
 }
+
+export function companyFallbackConfiguration(env: Environment = process.env) {
+  if (env.COMPANY_ANALYSIS_FALLBACK_PROVIDER !== 'bailian') throw new AppError(503, 'MODEL_CONFIGURATION', '备用分析暂未配置，请联系管理员检查。');
+  return { ...bailianConfiguration(env), model: env.DASHSCOPE_COMPANY_MODEL?.trim() || env.DASHSCOPE_SEARCH_MODEL?.trim() || 'qwen3.8-flash' };
+}

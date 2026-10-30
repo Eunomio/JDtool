@@ -1,7 +1,7 @@
 import { AppError } from './errors';
 import { reserveModelCall } from './usage';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { modelConfiguration } from './model-config';
+import { modelConfiguration, companyFallbackConfiguration } from './model-config';
 import { modelResponseError } from './model-errors';
 import { readModelStream } from './model-stream';
 
@@ -45,8 +45,8 @@ export async function withModelCall<T>(action: (signal: AbortSignal) => Promise<
   } finally { activeCalls--; }
 }
 
-export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true, purpose: 'standard' | 'complex' = 'standard', externalSignal?: AbortSignal, streamResult = false) {
-  const config = modelConfiguration();
+export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true, purpose: 'standard' | 'complex' | 'company-fallback' = 'standard', externalSignal?: AbortSignal, streamResult = false) {
+  const config = purpose === 'company-fallback' ? companyFallbackConfiguration() : modelConfiguration();
   if (config.provider === 'chatecnu') {
     const images = Array.isArray(content) && content.some(item => item.type === 'image_url');
     if (images) config.model = process.env.CHAT_ECNU_VISION_MODEL?.trim() || 'ecnu-max';
