@@ -93,3 +93,18 @@ test('手动公司分析的百炼备用不携带个人项目或简历原文', as
     expect(fallback).toBe(1);
   } finally { restore(); }
 });
+
+test('两个ECNU返回的事实没有原文支撑时尝试百炼，仍坚持引用核对', async () => {
+  const restore = await isolate(); const purposes: unknown[] = [];
+  try {
+    const data = await researchCompany({ job, sources: [source] }, () => {}, {
+      search: async () => { throw Error('不应重新搜索'); }, read: async () => { throw Error('不应重新读取'); }, validate: async () => { throw Error('不应访问'); },
+      json: async (_system, _content, _schema, _tokens, _constrained, purpose) => {
+        purposes.push(purpose); const data = result(source.id);
+        if (purpose !== 'company-fallback') data.facts[0].quotes[0].quote = '不存在于任何原文的错误引用';
+        return data;
+      },
+    });
+    expect(purposes).toEqual(['standard', 'complex', 'company-fallback']); expect(data.data.facts[0].sourceQuotes?.[0].quote).toBe(quote);
+  } finally { restore(); }
+});

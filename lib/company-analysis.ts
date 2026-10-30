@@ -3,7 +3,7 @@ import { AppError } from './errors';
 export async function retryCompanyAnalysis<T>(signal: AbortSignal, action: (signal: AbortSignal, attempt: 0 | 1 | 2) => Promise<T>, onRetry?: () => void): Promise<T> {
   const fallback = process.env.COMPANY_ANALYSIS_FALLBACK_PROVIDER === 'bailian';
   const limits = fallback ? [40000, 25000, 55000] : [75000, 50000];
-  const recoverable = ['MODEL_TIMEOUT', 'MODEL_UNAVAILABLE', 'MODEL_RATE_LIMITED', 'INVALID_RESULT', 'INCOMPLETE_RESULT', 'INVALID_RESEARCH'];
+  const recoverable = ['MODEL_TIMEOUT', 'MODEL_UNAVAILABLE', 'MODEL_RATE_LIMITED', 'INVALID_RESULT', 'INCOMPLETE_RESULT', 'INVALID_RESEARCH', 'NO_GROUNDED_RESEARCH'];
   const attempt = async (index: 0 | 1 | 2): Promise<T> => {
     signal.throwIfAborted();
     try { return await action(AbortSignal.any([signal, AbortSignal.timeout(limits[index])]), index); }

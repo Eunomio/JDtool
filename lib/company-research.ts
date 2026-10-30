@@ -42,9 +42,9 @@ export async function researchCompany(input: ResearchInput, emit: (event: Resear
     const analysis = await retryCompanyAnalysis(signal, async (attemptSignal, attempt) => {
       const response = output.safeParse(await dependencies.json(companyAnalysisPrompt, JSON.stringify({ job: input.job, sources: companySources(input.job, sources) }), z.toJSONSchema(output), 6500, false, attempt === 0 ? 'standard' : attempt === 1 ? 'complex' : 'company-fallback', attemptSignal, true));
       if (!response.success) throw new AppError(502, 'INVALID_RESEARCH', '资料已保存，业务分析尚未完成，请重试。');
-      return response.data;
+      return groundResearch(response.data, input, sources);
     }, () => progress('analyzing', '正在重新整理分析，已找到的资料会保留', queries));
-    const data = groundResearch(analysis, input, sources); data.research!.queries = queries;
+    const data = analysis; data.research!.queries = queries;
     emit({ type: 'result', data }); return { sources, data };
   };
   if (input.sources?.length) return analyze(input.sources, []);
