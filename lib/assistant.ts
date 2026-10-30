@@ -68,8 +68,8 @@ async function generate<T extends z.ZodType>(schema: T, prompt: string, input: A
   delete jsonSchema.$schema;
   const style = input.action === 'exercise' || input.action === 'scenario' ? `\n${workplaceStyle}${input.stage === 'dialogue' ? '\n本轮只回复用户向同事提出的问题，未提供的信息不要编造。consequence为空，feedback=null，不推进任务。' : input.stage === 'review' ? '\n复盘基于用户实际选择与提问，不评价性格，不把练习写成用户实际完成的工作。' : ''}` : '';
   const limit = input.action === 'exercise' ? input.mode === 'interview' ? 2200 : input.mode === 'scenario' ? 3800 : 6000 : input.action === 'interview' && input.stage === 'followup' ? 1000 : input.action === 'scenario' && input.stage !== 'review' ? 1400 : 6000;
-  const request = async (signal?: AbortSignal) => {
-    const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, input.action === 'recommendations' ? 9000 : limit, false, ['recommendations', 'company'].includes(input.action) ? 'complex' : 'standard', signal));
+  const request = async (signal?: AbortSignal, attempt = 0) => {
+    const result = schema.safeParse(await modelJson(`${commonPrompt}\n${prompt}${style}`, JSON.stringify(input), jsonSchema, input.action === 'recommendations' ? 9000 : limit, false, input.action === 'recommendations' || (input.action === 'company' && attempt === 1) ? 'complex' : 'standard', signal, input.action === 'company'));
     if (!result.success) throw new AppError(502, 'INVALID_RESULT', '本次结果未完整生成，请重试。');
     return result.data;
   };

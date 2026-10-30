@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     limitRequest(request);
     const input = researchInput.safeParse(await readJson(request, 180000));
     if (!input.success) throw new AppError(400, 'INVALID_COMPANY', '请先补充公司名称，再搜索业务资料。');
-    searchConfiguration();
+    if (!input.data.sources?.length) searchConfiguration();
     if (activeResearch >= 2) throw new AppError(429, 'RESEARCH_BUSY', '正在整理其他公司的资料，请稍后再试。');
     activeResearch++;
     const stream = researchStream(request.signal, async (signal, emit) => {

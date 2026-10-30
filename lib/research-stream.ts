@@ -25,7 +25,8 @@ export function researchStream(
       catch (error) {
         const analysisFailed = stage === 'analyzing' && (!(error instanceof AppError) || ['MODEL_TIMEOUT', 'MODEL_UNAVAILABLE', 'INVALID_RESEARCH', 'INVALID_RESULT', 'INCOMPLETE_RESULT'].includes(error.code));
         const message = analysisFailed
-          ? '公司资料已保存，业务分析暂未完成。可稍后展开“查看来源与补充公司资料”，点击“分析已保存资料”。'
+          ? `公司资料已保存，${error instanceof AppError && error.code === 'MODEL_TIMEOUT' ? '分析等待超时' : '分析返回的内容未完整生成'}，可点击“重新分析”继续。`
+          : stage === 'analyzing' && error instanceof AppError && error.code === 'MODEL_RATE_LIMITED' ? '公司资料已保存，当前分析请求较多，请稍后点击“重新分析”。'
           : error instanceof AppError ? error.message : '这次搜索尚未完成，已读取的资料会保留，请稍后重试。';
         emit({ type: 'error', message });
       } finally {

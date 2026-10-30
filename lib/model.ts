@@ -2,6 +2,8 @@ import { AppError } from './errors';
 import { reserveModelCall } from './usage';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { modelConfiguration } from './model-config';
+import { modelResponseError } from './model-errors';
+import { readModelStream } from './model-stream';
 
 const requests = new AsyncLocalStorage<AbortSignal>();
 
@@ -43,7 +45,7 @@ export async function withModelCall<T>(action: (signal: AbortSignal) => Promise<
   } finally { activeCalls--; }
 }
 
-export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true, purpose: 'standard' | 'complex' = 'standard', externalSignal?: AbortSignal) {
+export async function modelJson(system: string, content: Content, schema?: Record<string, unknown>, maxTokens = 6000, constrained = true, purpose: 'standard' | 'complex' = 'standard', externalSignal?: AbortSignal, streamResult = false) {
   const config = modelConfiguration();
   if (config.provider === 'chatecnu') {
     const images = Array.isArray(content) && content.some(item => item.type === 'image_url');
@@ -56,14 +58,18 @@ export async function modelJson(system: string, content: Content, schema?: Recor
     const response = await fetch(`${config.base}/chat/completions`, {
       method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: config.model, stream: false, temperature: 0.1,
+        model: config.model, stream: streamResult, temperature: 0.1,
         ...(config.provider === 'bailian' ? { enable_thinking: false } : { thinking: { type: 'disabled' } }), max_tokens: maxTokens,
         messages: [{ role: 'system', content: instructions }, { role: 'user', content }],
         response_format: jsonSchema ? { type: 'json_schema', json_schema: { name: 'job_result', schema } } : { type: 'json_object' },
       }), signal,
     });
-    if (!response.ok) { await response.body?.cancel(); throw new AppError(response.status === 429 ? 429 : 502, 'MODEL_UNAVAILABLE', response.status === 429 ? '本次使用较多，请稍后重试。' : '暂时无法完成解析，已保留输入内容，请稍后重试。'); }
-    const data = await response.json();
+    if (!response.ok) {
+      const error = await modelResponseError(response);
+      console.warn('Model request failed', { provider: config.provider, purpose, status: response.status, code: error.code });
+      throw error;
+    }
+    const data = streamResult && response.headers.get('content-type')?.includes('text/event-stream') ? await readModelStream(response, signal) : await response.json();
     if (data.choices?.[0]?.finish_reason === 'length') throw new AppError(502, 'INCOMPLETE_RESULT', '本次内容较长，请分成更清晰的截图或缩短正文后重试。');
     const result = data.choices?.[0]?.message?.content;
     if (typeof result !== 'string') throw new AppError(502, 'INVALID_RESULT', '没有得到完整结果，请重试。');

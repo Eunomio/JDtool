@@ -89,13 +89,13 @@ test('自动公司研究保留来源与岗位关联，刷新复用结果，准�
 
 test('研究失败保留已读取资料，重试成功后不重复保存来源', async ({ page }) => {
   let requests = 0;
-  await page.route('**/api/company/research', (route) => { requests++; return route.fulfill({ contentType: 'application/x-ndjson', body: stream([{ type: 'sources', sources: [source] }, requests === 1 ? { type: 'error', message: '资料已保存，业务分析尚未完成，请重试。' } : { type: 'result', data: result }]) }); });
+  await page.route('**/api/company/research', (route) => { requests++; if (requests === 2) expect(route.request().postDataJSON().sources).toEqual([source]); return route.fulfill({ contentType: 'application/x-ndjson', body: stream(requests === 1 ? [{ type: 'sources', sources: [source] }, { type: 'error', message: '资料已保存，业务分析尚未完成，请重试。' }] : [{ type: 'result', data: result }]) }); });
   await seed(page); await page.getByRole('button', { name: job.title, exact: true }).click();
   await page.getByRole('tab', { name: '公司与业务', exact: true }).click();
   await expect(page.locator('main').getByRole('alert')).toContainText('资料已保存');
   await page.getByText('查看来源与补充公司资料', { exact: false }).click();
   await expect(page.getByRole('link', { name: `${source.label} ↗`, exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '重试搜索', exact: true }).click(); await expect(page.getByText(result.research.summary, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '重新分析', exact: true }).click(); await expect(page.getByText(result.research.summary, { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: `${source.label} ↗`, exact: true })).toHaveCount(1); expect(requests).toBe(2);
 });
 

@@ -17,6 +17,7 @@ export default function CompanyResearch({ job, projects, sources, refresh, addTa
   const [progress, setProgress] = useState('');
   const [queries, setQueries] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [canResume, setCanResume] = useState(false);
   const [sourceText, setSourceText] = useState(''); const [sourceUrl, setSourceUrl] = useState(''); const [sourceLabel, setSourceLabel] = useState('公司公开资料');
   const controller = useRef<AbortController | null>(null); const attempted = useRef(false);
   const version = inputVersion(job, [], sources);
@@ -43,28 +44,30 @@ export default function CompanyResearch({ job, projects, sources, refresh, addTa
     });
     setSaved(record); await refresh();
   }
-  async function search() {
+  async function search(reuse = false) {
     if (controller.current) return;
     const next = new AbortController(); controller.current = next;
     setBusy(true); setError(''); setStep(0); setProgress('正在整理公司搜索方向');
     let resultVersion = version;
+    const resumeSources = reuse ? sources.filter(source => source.jobId === job.id && (source.kind === 'web' || source.kind === 'snippet')).slice(0, 6) : undefined;
+    let sourcesSaved = !!resumeSources?.length;
     try {
       await streamResearch({ id: job.id, title: job.title, company: job.company, direction: job.direction, requirements: job.requirements, responsibilities: job.responsibilities }, next.signal, async (event) => {
         if (next.signal.aborted) return;
         if (event.type === 'progress') { setStep(['planning', 'searching', 'reading', 'analyzing'].indexOf(event.stage)); setProgress(event.message); if (event.queries) setQueries(event.queries); }
-        if (event.type === 'sources') resultVersion = await persistSources(event.sources);
+        if (event.type === 'sources') { resultVersion = await persistSources(event.sources); sourcesSaved = true; }
         if (event.type === 'result') {
           await persistResult(event.data, resultVersion);
         }
-      });
-    } catch (error) { if (!next.signal.aborted) setError(error instanceof Error ? error.message : '搜索尚未完成，请重试。'); }
+      }, resumeSources);
+    } catch (error) { if (!next.signal.aborted) { setCanResume(sourcesSaved); setError(error instanceof Error ? error.message : '搜索尚未完成，请重试。'); } }
     finally { if (controller.current === next) { controller.current = null; setBusy(false); } }
   }
   async function run(task: () => Promise<void>) { setBusy(true); setError(''); try { await task(); } catch (error) { setError(error instanceof Error ? error.message : '未能完成，请重试。'); } finally { setBusy(false); } }
   const stale = saved && saved.inputVersion !== version;
-  return <section data-tour="company-research" className="panel company-research" hidden={section === 'requirements'} aria-labelledby="company-heading"><div className="section-heading"><div><h2 id="company-heading">{understandingSections.find(item => item.id === section)?.label || '公司与业务'}</h2>{!job.company.trim() && <p className="muted">请先补充公司名称。</p>}</div><button className={saved ? 'secondary' : 'primary'} disabled={busy || !loaded || !job.company.trim()} onClick={search}><Icon name="search" size={16} />{busy ? '正在研究公司…' : saved ? '更新公司研究' : '搜索公司业务'}</button></div>
+  return <section data-tour="company-research" className="panel company-research" hidden={section === 'requirements'} aria-labelledby="company-heading"><div className="section-heading"><div><h2 id="company-heading">{understandingSections.find(item => item.id === section)?.label || '公司与业务'}</h2>{!job.company.trim() && <p className="muted">请先补充公司名称。</p>}</div><button className={saved ? 'secondary' : 'primary'} disabled={busy || !loaded || !job.company.trim()} onClick={() => search()}><Icon name="search" size={16} />{busy ? '正在研究公司…' : saved ? '更新公司研究' : '搜索公司业务'}</button></div>
     {busy && controller.current && <div className="research-progress" role="status"><div className="research-steps">{steps.map((label, index) => <span key={label} className={step === index ? 'current' : step > index ? 'done' : ''}><b>{step > index ? <Icon name="check" size={12} /> : index + 1}</b>{label}</span>)}</div><AsyncStatus label={progress || '正在整理公司资料'} />{queries.map((query) => <small key={query}>{query}</small>)}<button className="text-button" onClick={() => { controller.current?.abort(); setProgress(''); }}>停止搜索</button></div>}
-    {error && <div className="notice error" role="alert">{error}<button className="text-button" disabled={busy} onClick={search}>重试搜索</button></div>}
+    {error && <div className="notice error" role="alert">{error}<button className="secondary small" disabled={busy} onClick={() => search(canResume)}>{canResume ? '重新分析' : '重试搜索'}</button></div>}
     {!saved && section !== 'requirements' && <div role="tabpanel" id={`岗位与公司内容-panel-${section}`} aria-labelledby={`岗位与公司内容-${section}`}>{!busy && !error && <div className="research-empty"><Icon name="globe" size={36} /><div><h3>查看公司业务和岗位关联</h3><p>搜索公开资料后，可分别查看公司业务、岗位准备建议和面试问题。</p></div></div>}</div>}
     {saved && <>{stale && <div className="notice">岗位或资料已更新，可以更新公司研究后继续准备。</div>}<CompanyInsights section={section} data={saved.data} createdAt={saved.createdAt} job={job} projects={projects} sources={sources} addTask={text => addTask(text, [job.id])} /></>}
     <details className="source-library"><summary>查看来源与补充公司资料 <span className="count">{sources.length}</span></summary><div className="source-cards">{sources.map((source) => <article className="source-card" key={source.id}><div className="source-domain"><Icon name="link" size={14} />{source.url && URL.canParse(source.url) ? new URL(source.url).hostname : '补充资料'}<span>{source.kind === 'snippet' ? '搜索摘要' : source.kind === 'web' ? '已读取网页' : '手动补充'}</span></div><h3>{source.url ? <a href={source.url} target="_blank" rel="noreferrer">{source.label} ↗</a> : source.label}</h3><small className="muted">读取于 {new Date(source.collectedAt).toLocaleDateString('zh-CN')}{source.publishedAt ? ` · 页面标注时间：${source.publishedAt}` : ''}</small><details><summary>查看资料内容</summary><pre className="source-text">{source.text}</pre><button className="text-button danger" disabled={busy} onClick={() => run(async () => { await database.sources.delete(source.id); await refresh(); })}>移除这条资料</button></details></article>)}</div>

@@ -237,7 +237,7 @@ test('百炼保留图片输入与结构要求，使用兼容的JSON模式且失�
       return calls === 1 ? Response.json({ choices: [{ message: { content: '{"title":"产品经理"}' } }] }) : Response.json({ error: 'test-only-bailian secret upstream' }, { status: 401 });
     };
     expect(await modelJson('识别', content, { type: 'object', required: ['title'] })).toEqual({ title: '产品经理' });
-    await expect(modelJson('识别', content)).rejects.toThrow('暂时无法完成解析');
+    await expect(modelJson('识别', content)).rejects.toThrow('认证或访问权限异常');
     expect(calls).toBe(2);
   } finally { globalThis.fetch = originalFetch; restore(); restoreModel(); }
 });
