@@ -1,6 +1,7 @@
 'use client';
 
 import type { CompanyResult, Job, Project, Source } from '../lib/database';
+import { completeCompanyQuestions } from '../lib/company-questions';
 import { AdviceList } from './evidence';
 import { Icon, Tabs } from './ui';
 
@@ -32,13 +33,14 @@ export function JobRequirements({ job, hidden = false }: { job: Job; hidden?: bo
 
 export function CompanyInsights({ section, data, createdAt, job, projects, sources, addTask }: { section: UnderstandingTab; data: CompanyResult; createdAt?: string; job: Job; projects: Project[]; sources: Source[]; addTask: (text: string) => void }) {
   const evidence = { jobs: [job], projects, sources };
+  const questions = completeCompanyQuestions(job, data.questions, sources, [...(data.businesses || []), ...data.facts]);
   return <>
     <div {...panelProps('business')} hidden={section !== 'business'}>
       {data.research && <div className="research-summary"><span className="tag">基于公开来源</span>{createdAt && <span className="muted">{new Date(createdAt).toLocaleDateString('zh-CN')}</span>}<p>{data.research.summary}</p>{data.research.identityNote && <details><summary>公司主体核对</summary><p>{data.research.identityNote}</p></details>}</div>}
       <AdviceList items={data.businesses?.length ? data.businesses : data.facts} {...evidence} />
     </div>
     <div {...panelProps('role')} hidden={section !== 'role'}><AdviceList items={data.roleInsights || []} {...evidence} addTask={addTask} emptyText="还没有岗位关联建议，可更新公司研究或分析已保存资料。" /></div>
-    <div {...panelProps('questions')} hidden={section !== 'questions'}><AdviceList items={data.questions} {...evidence} addTask={addTask} emptyText="目前没有需要补充的面试问题。" /></div>
+    <div {...panelProps('questions')} hidden={section !== 'questions'}><AdviceList items={questions} {...evidence} addTask={addTask} emptyText="还没有面试问题，可更新公司研究后重试。" /></div>
     <div {...panelProps('uncertain')} hidden={section !== 'uncertain'}><AdviceList items={data.hypotheses} {...evidence} emptyText="目前没有额外列出的待确认信息。" /></div>
   </>;
 }

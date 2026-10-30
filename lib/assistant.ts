@@ -6,6 +6,7 @@ import { splitDialogue } from './dialogue';
 import { companyGuidance } from './company-guidance';
 import { companySources } from './company-context';
 import { retryCompanyAnalysis } from './company-analysis';
+import { completeCompanyQuestions } from './company-questions';
 import { practiceSources } from './practice-context';
 import { groundedCoverage } from './project-match';
 
@@ -24,7 +25,7 @@ const projectOutput = z.object({ projects: z.array(z.object({
 })).max(20) });
 const preparationOutput = z.object({ priorities: z.array(evidence).max(10), strengths: z.array(evidence).max(10), gaps: z.array(evidence).max(10), companyResearch: z.array(evidence).max(10) });
 const companyEvidence = evidence.extend({ example: short.optional(), sourceQuotes: z.array(z.object({ sourceId: z.string(), quote: short })).max(5).optional() });
-const companyOutput = z.object({ facts: z.array(companyEvidence).max(12), businesses: z.array(companyEvidence).max(6).optional(), roleInsights: z.array(companyEvidence).max(6).optional(), hypotheses: z.array(companyEvidence).max(8), questions: z.array(companyEvidence).max(8) });
+const companyOutput = z.object({ facts: z.array(companyEvidence).max(12), businesses: z.array(companyEvidence).max(6).optional(), roleInsights: z.array(companyEvidence).max(6).optional(), hypotheses: z.array(companyEvidence).max(8), questions: z.array(companyEvidence).max(8).default([]) });
 const compareOutput = z.object({ common: z.array(evidence).max(12), differences: z.array(z.object({ jobId: z.string(), uniqueRequirements: z.array(evidence).max(10), projects: z.array(evidence).max(8), preparation: z.array(evidence).max(8) })).max(3), reusable: z.array(evidence).max(12) });
 const feedback = z.object({ strengths: z.array(short).max(10), dimensions: z.array(z.object({ name: z.string(), feedback: short, requirementIds: ids })).max(10), improvements: z.array(short).max(10), outline: z.array(short).max(15), nextActions: z.array(short).max(8) });
 const interviewOutput = z.object({ followup: z.string(), feedback: feedback.nullable() });
@@ -172,7 +173,8 @@ export async function assist(input: AssistInput) {
     data.businesses = data.businesses?.filter(item => item.sourceIds.length);
     data.roleInsights = data.roleInsights?.filter(item => item.sourceIds.length && item.requirementIds.length);
     const normalized = (value: string) => value.replace(/\s+/g, '');
-    for (const rows of [data.facts, data.businesses, data.roleInsights, data.hypotheses, data.questions]) for (const row of rows || []) {
+    data.questions = completeCompanyQuestions(input.job!, data.questions, input.sources || [], [...(data.businesses || []), ...data.facts]);
+    for (const rows of [data.facts, data.businesses, data.roleInsights, data.hypotheses]) for (const row of rows || []) {
       row.sourceQuotes = row.sourceQuotes?.filter(quote => normalized(quote.quote).length >= 8 && row.sourceIds.includes(quote.sourceId) && input.sources?.some(source => source.id === quote.sourceId && normalized(source.text).includes(normalized(quote.quote))));
       if (!row.sourceQuotes?.length) delete row.example;
     }

@@ -6,13 +6,34 @@ const source = { id: 'research-source', jobId: job.id, label: '云帆科技产�
 const advice = { text: '围绕企业团队的项目协同，准备需求优先级判断的方法。', reason: '对应JD中的需求分析职责。', requirementIds: ['r1'], factIds: [], sourceIds: [source.id] };
 const result = { facts: [advice], businesses: [advice], roleInsights: [advice], hypotheses: [], questions: [{ ...advice, text: '这个岗位主要负责哪类客户的协作流程？' }], research: { company: job.company, summary: '云帆科技提供企业协作产品。', identityNote: '来源描述的公司名称与当前岗位一致。', queries: ['云帆科技 企业协作 官网'], searchedAt: now } };
 
-async function seed(page: Page) {
+async function seed(page: Page, saved?: typeof result) {
   await page.goto('/'); await expect(page.getByRole('button', { name: '体验6个示例岗位' })).toBeEnabled();
   await page.getByText('资料备份', { exact: true }).click(); page.once('dialog', (dialog) => dialog.accept());
-  await page.getByLabel('选择备份文件').setInputFiles({ name: 'research.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'jdtool-backup', version: 2, jobs: [job] })) });
+  await page.getByLabel('选择备份文件').setInputFiles({ name: 'research.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ format: 'jdtool-backup', version: 2, jobs: [job], ...(saved ? { sources: [source], companies: [{ id: 'legacy-research', jobId: job.id, createdAt: now, inputVersion: 'legacy', data: saved }] } : {}) })) });
   await expect(page.getByText('备份已恢复。', { exact: true })).toBeVisible(); await page.getByText('资料备份', { exact: true }).click();
 }
 function stream(events: unknown[]) { return events.map((event) => JSON.stringify(event)).join('\n') + '\n'; }
+
+test('旧的空白面试问题直接补齐，可查看JD依据和加入计划，无需重新研究公司', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/company/research', route => { requests++; return route.abort(); });
+  await seed(page, { ...result, questions: [] });
+  await page.getByRole('button', { name: job.title, exact: true }).click();
+  await page.getByRole('tab', { name: '面试问题', exact: true }).click();
+  const panel = page.getByRole('tabpanel', { name: '面试问题', exact: true });
+  await expect(panel.locator('.advice-item')).toHaveCount(2);
+  await expect(panel.getByText('目前没有需要补充的面试问题。', { exact: true })).toHaveCount(0);
+  const first = panel.locator('.advice-item').first();
+  await expect(first).toContainText('企业协作产品需求分析');
+  await first.getByText('查看依据', { exact: true }).click();
+  await expect(first.getByText(job.content, { exact: true })).toBeVisible();
+  await first.getByRole('button', { name: '加入我的计划', exact: true }).click();
+  await expect(first.getByRole('button', { name: '已加入计划', exact: true })).toBeDisabled();
+  await page.reload(); await page.getByRole('button', { name: '岗位清单', exact: true }).click();
+  await page.getByRole('button', { name: job.title, exact: true }).click(); await page.getByRole('tab', { name: '面试问题', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: '面试问题', exact: true }).locator('.advice-item')).toHaveCount(2);
+  expect(requests).toBe(0);
+});
 
 test('五个内容页签分别展示，举例按需展开，切换不重复研究，备份恢复保留举例和依据', async ({ page }) => {
   let calls = 0;

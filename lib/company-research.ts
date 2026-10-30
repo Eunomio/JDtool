@@ -8,6 +8,7 @@ import type { Advice, CompanyResult, Source } from './database';
 import { companyAnalysisPrompt } from './company-guidance';
 import { companySources } from './company-context';
 import { retryCompanyAnalysis } from './company-analysis';
+import { completeCompanyQuestions } from './company-questions';
 
 const reference = z.object({ id: z.string().max(200), text: z.string().max(4000) });
 const sourceInput = z.object({ id: z.string().min(1).max(200), jobId: z.string().min(1).max(200), label: z.string().max(1000), url: z.string().max(4000).url().refine(value => { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; }), text: z.string().trim().min(1).max(14000), collectedAt: z.string().max(100), kind: z.enum(['web', 'snippet']), publishedAt: z.string().max(200).optional() });
@@ -15,7 +16,8 @@ export const researchInput = z.object({ job: z.object({ id: z.string().min(1).ma
 type ResearchInput = z.infer<typeof researchInput>;
 export type ResearchEvent = { type: 'progress'; stage: 'planning' | 'searching' | 'reading' | 'analyzing'; message: string; queries?: string[] } | { type: 'sources'; sources: Source[] } | { type: 'result'; data: CompanyResult } | { type: 'error'; message: string } | { type: 'heartbeat' };
 const item = z.object({ text: z.string().max(1200), reason: z.string().max(1000), example: z.string().max(1200).optional(), requirementIds: z.array(z.string()).max(10), sourceIds: z.array(z.string()).max(10), quotes: z.array(z.object({ sourceId: z.string(), quote: z.string().trim().min(8).max(400) })).max(2) });
-const output = z.object({ identityNote: z.string().max(1200), identityMatched: z.boolean(), facts: z.array(item).max(3), businesses: z.array(item).max(3), roleInsights: z.array(item).max(3), hypotheses: z.array(item).max(2), questions: z.array(item).max(3) });
+const question = item.extend({ text: item.shape.text.trim().min(1), quotes: item.shape.quotes.default([]) });
+const output = z.object({ identityNote: z.string().max(1200), identityMatched: z.boolean(), facts: z.array(item).max(3), businesses: z.array(item).max(3), roleInsights: z.array(item).max(3), hypotheses: z.array(item).max(2), questions: z.array(question).max(3).default([]) });
 
 export function groundResearch(data: z.infer<typeof output>, input: ResearchInput, sources: Source[]): CompanyResult {
   const requirements = new Set([...(input.job.requirements || []), ...(input.job.responsibilities || [])].map((row) => row.id));
@@ -30,7 +32,8 @@ export function groundResearch(data: z.infer<typeof output>, input: ResearchInpu
   if (!data.identityMatched) throw new AppError(422, 'COMPANY_UNCERTAIN', `还无法确认搜到的资料属于“${input.job.company}”。请核对公司全称，或补充公司官网再分析。`);
   const facts = grounded(data.facts); const businesses = grounded(data.businesses);
   if (!facts.length && !businesses.length) throw new AppError(422, 'NO_GROUNDED_RESEARCH', '这次资料不足以说明公司业务，请补充公司官网或稍后重新搜索。');
-  return { facts, businesses, roleInsights: grounded(data.roleInsights, true), hypotheses: grounded(data.hypotheses), questions: grounded(data.questions), research: { company: input.job.company, summary: (facts.length ? facts : businesses).slice(0, 2).map((row) => row.text).join(' '), identityNote: data.identityNote, queries: [], searchedAt: new Date().toISOString() } };
+  const questions = completeCompanyQuestions(input.job, data.questions.map(({ quotes, ...row }) => ({ ...row, factIds: [], sourceQuotes: quotes })), sources, [...businesses, ...facts]);
+  return { facts, businesses, roleInsights: grounded(data.roleInsights, true), hypotheses: grounded(data.hypotheses), questions, research: { company: input.job.company, summary: (facts.length ? facts : businesses).slice(0, 2).map((row) => row.text).join(' '), identityNote: data.identityNote, queries: [], searchedAt: new Date().toISOString() } };
 }
 
 export async function researchCompany(input: ResearchInput, emit: (event: ResearchEvent) => void, dependencies = { search: webSearch, read: publicRequest, validate: validatePublicUrl, json: modelJson }) {
